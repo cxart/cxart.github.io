@@ -2,6 +2,21 @@
 <html>
 <head>
 	<title>carter allen | home</title>
+
+    <script>
+        var images = ["its_me.jpg", "its_me2.jpg", "its_me3.jpg", "its_me4.jpg", "its_me5.jpg", "its_me6.jpg"]
+        var colors = ["#55a366", "#9440a3", "#7a7771", "#b84123", "#3245c0", "#b0a571"]
+        function setImageAndColor(){
+            var rand = Math.floor(Math.random() * images.length); // Generates random number
+            var image = document.getElementById("me");
+            image.src = images[rand]
+            var links = document.getElementsByTagName("a");
+            for (var i = 0; i < links.length; i++) {
+                links[i].style.color = colors[rand];
+            }
+        }
+    </script>
+
 	<style>
         @font-face {
             font-family: 'Open Sans';
@@ -39,7 +54,7 @@
             font-family: 'open sans',arial,sans-serif;
             font-weight: normal;
 			margin-right: 50px;
-            font-size: 110%;
+            font-size: 100%;
 		}
         #header div {
 			text-align: center;
@@ -58,7 +73,7 @@
             font-weight: 100;
 		}
 		#content a{
-			color: rgb(83, 0, 102);
+			color: black;
 			text-decoration: underline;
 		}
         #content p[bot]{
@@ -68,13 +83,14 @@
         }
 	</style>
 </head>
-<body>
+<body onload=setImageAndColor()>
+
 	<div id="header">
         <div>
             <h1>carter allen</h1>
-            <h2>atcarterallen@gmail.com</h2>
+            <h2>atcarterallen [at] gmail [dot] com</h2>
         </div>
-		<img src="its_me.jpg", width=200, height=200>
+		<img id="me", src="", width=220, height=220>
 	</div>
 	<div id="content">
 
@@ -83,7 +99,7 @@
             <a href="https://www.eapsychology.org/", target="blank">
                 Effective Altruism Psychology Lab</a>
             at NYU and the 
-            <a href="https://www.eapsychology.org/", target="blank">
+            <a href="https://cushmanlab.fas.harvard.edu/", target="blank">
                 Moral Psychology Research Lab</a>
             at Harvard University. 
             I enjoy thinking about a bunch of dorky topics, but recently I'm 
@@ -115,8 +131,8 @@
         </p>
 
         <p>
-            I made this website myself, by which I mean that I hardly made it at all
-            and outsourced 80% of the coding work to
+            I built this website myself, by which I mean that I hardly did anything
+            and outsourced 80% of the coding to
             <a href="https://chat.openai.com/chat", target="blank">
                 an AI</a>, 
             which is how I do about 15% of my job these days, too. 
