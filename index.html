@@ -46,16 +46,21 @@
 			justify-content: flex-start;
 			height: 100vh;
 			margin: 0;
-			padding: 0;
+			padding: 20px;
 			font-family: 'open sans',arial,sans-serif;
 			color: rgb(0, 0, 0);
 		}
+        img {
+            max-width: 100%;
+            height: auto;
+        }
 		#header {
 			display: flex;
 			align-items: center;
 			margin-bottom: 20px;
-            margin-top: 60px;
+            margin-top: 30px;
             font-family: Georgia, 'Times New Roman', Times, serif;
+            flex-wrap: wrap;
 		}
 		#header h1 {
             font-weight: normal;
@@ -78,14 +83,16 @@
 			height: auto;
 		}
 		#content {
-			max-width: 700px;
-			width: 100%;
-			padding: 0 20px;
-			text-align: left;
+            max-width: 700px;
+            width: 100%;
+            padding: 1 20px;
+            margin: 0px auto;
+            text-align: left;
             font-size: 100%;
             line-height: 150%;
             font-weight: 100;
-		}
+            box-sizing: border-box;
+        }
 		#content a{
 			color: black;
 			text-decoration: underline;
@@ -94,6 +101,39 @@
             color:rgb(200, 200, 200);
             font-size:80%;
             text-align:center;
+        }
+        /* For tablets & small screens */
+        @media (max-width: 768px) {
+            #header {
+                flex-direction: column;
+                align-items: center;
+                margin-top: 20px;
+            }
+
+            #header h1 {
+                margin-right: 0;
+                font-size: 350%;
+            }
+
+            #header h2 {
+                margin-right: 0;
+                font-size: 100%;
+            }
+
+            #header img {
+                margin-top: 20px;
+            }
+        }
+
+        /* For very small screens, like smartphones */
+        @media (max-width: 480px) {
+            #content {
+                padding: 0 10px;
+            }
+
+            #header h1 {
+                font-size: 250%;
+            }
         }
 	</style>
 </head>
