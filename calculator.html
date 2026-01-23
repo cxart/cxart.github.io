@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XY6XJG6CRG"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XY6XJG6CRG');
+    </script>
+
+    <title>how many forecasting questions?</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Georgia&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --secondary-text: #787878;
+            --accent-color: #3245c0;
+            --border-color: #e0e0e0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+            border-bottom: 1px dotted currentColor;
+            transition: all 0.2s ease;
+        }
+
+        a:hover {
+            border-bottom: 1px solid currentColor;
+            opacity: 0.9;
+        }
+
+        #header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        #header h1 {
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-weight: normal;
+            font-size: 2.5rem;
+            margin: 0;
+        }
+
+        #header h2 {
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-weight: normal;
+            font-size: 1rem;
+            margin-top: 5px;
+            color: var(--secondary-text);
+        }
+
+        #header-text {
+            text-align: center;
+        }
+
+        nav {
+            margin-bottom: 30px;
+        }
+
+        nav a {
+            margin: 0 15px;
+            font-size: 0.95rem;
+        }
+
+        #content {
+            max-width: 800px;
+            width: 100%;
+            padding: 0 20px;
+            margin: 0 auto;
+            text-align: left;
+            font-size: 1rem;
+            font-weight: 300;
+            box-sizing: border-box;
+        }
+
+        .calculator-container {
+            background: #fafafa;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 400;
+            font-size: 0.95rem;
+        }
+
+        .input-group .hint {
+            font-size: 0.8rem;
+            color: var(--secondary-text);
+            margin-top: 3px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            font-size: 1rem;
+            font-family: 'Open Sans', Arial, sans-serif;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .results-container {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin-top: 25px;
+            border: 2px solid var(--accent-color);
+        }
+
+        .results-container h3 {
+            margin-top: 0;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-weight: normal;
+            color: var(--accent-color);
+        }
+
+        .result-item {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .result-label {
+            font-size: 0.85rem;
+            color: var(--secondary-text);
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .result-detail {
+            font-size: 0.85rem;
+            color: var(--secondary-text);
+            margin-top: 5px;
+        }
+
+        #chart-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        .assumptions {
+            background: #f0f4f8;
+            border-left: 3px solid var(--accent-color);
+            border-radius: 0 8px 8px 0;
+            padding: 15px 20px;
+            margin: 20px 0 30px 0;
+            font-size: 0.9rem;
+        }
+
+        .assumptions h4 {
+            margin: 0 0 10px 0;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-weight: normal;
+            color: var(--accent-color);
+        }
+
+        .assumptions ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .assumptions li {
+            margin: 5px 0;
+            color: #444;
+        }
+
+        .github-link {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .github-link a {
+            font-size: 0.95rem;
+        }
+
+        #budget-table-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+
+        #budget-table-container h3 {
+            margin: 0 0 5px 0;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-weight: normal;
+            color: var(--accent-color);
+        }
+
+        .table-subtitle {
+            margin: 0 0 15px 0;
+            font-size: 0.85rem;
+            color: var(--secondary-text);
+        }
+
+        #budget-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        #budget-table th {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 2px solid var(--border-color);
+            font-weight: 400;
+            color: var(--secondary-text);
+        }
+
+        #budget-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #budget-table tr.current-budget {
+            background: #f5f7fa;
+            font-weight: 600;
+        }
+
+        #budget-table tr.current-budget td:first-child::after {
+            content: " (current)";
+            font-weight: 400;
+            color: var(--secondary-text);
+            font-size: 0.8rem;
+        }
+
+        .methodology {
+            margin-top: 40px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .methodology h4 {
+            margin-top: 0;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-weight: normal;
+        }
+
+        .methodology p {
+            margin: 10px 0;
+        }
+
+        .methodology code {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }
+
+        .footer {
+            color: var(--secondary-text);
+            font-size: 0.8rem;
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            #header h1 {
+                font-size: 2rem;
+            }
+
+            .input-row {
+                grid-template-columns: 1fr;
+            }
+
+            .calculator-container {
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #content {
+                padding: 0 10px;
+            }
+
+            #header h1 {
+                font-size: 1.8rem;
+            }
+
+            body {
+                padding: 15px;
+            }
+
+            nav a {
+                margin: 0 10px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // Apply accent color from homepage
+        const savedColor = localStorage.getItem('accentColor');
+        if (savedColor) {
+            document.documentElement.style.setProperty('--accent-color', savedColor);
+        }
+    </script>
+    <div id="header">
+        <div id="header-text">
+            <h1>how many forecasting questions?</h1>
+            <h2>power calculator for forecasting studies</h2>
+        </div>
+    </div>
+
+    <nav>
+        <a href="index.html">&larr; back to home</a>
+    </nav>
+
+    <div id="content">
+        <p>
+            Given a fixed budget, this tool determines the optimal number of forecasting questions to 
+            include in a study to maximize power to detect differences between groups.
+        </p>
+
+        <div class="assumptions">
+            <h4>Key Assumptions</h4>
+            <ul>
+                <li>Assumes equal allocation of participants to each condition (i.e., equally powered pairwise comparisons)</li>
+                <li>Assumes within-participant correlation in forecasting accuracy (ρ) is constant across all question pairs</li>
+                <li>Assumes aggregated scores are approximately normally distributed</li>
+                <li>Outputs reflect 80% power to detect differences between groups, two-tailed α = 0.05</li>
+            </ul>
+        </div>
+
+        <div class="calculator-container">
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="budget">Study Budget ($)</label>
+                    <input type="number" id="budget" value="1000" min="100" step="100">
+                    <div class="hint">Total amount available for participant compensation</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="rho">Within-Participant Correlation (ρ)</label>
+                    <input type="number" id="rho" value="0.30" min="0" max="1" step="0.05">
+                    <div class="hint">Assumed within-participant correlation in accuracy across questions. Estimate based on FRI studies.</div>
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="timePerQuestion">Time per Question (minutes)</label>
+                    <input type="number" id="timePerQuestion" value="2.5" min="0.5" step="0.5">
+                    <div class="hint">Anticipated time participants will spend on each question. Default 2.5 min for quantile elicitation questions</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="baseTime">Base Study Time (minutes)</label>
+                    <input type="number" id="baseTime" value="15" min="1" step="1">
+                    <div class="hint">Anticipated time for instructions, consent, demographics, etc. - everything other than the forecasting questions.</div>
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="costPerMinute">Cost per Minute ($)</label>
+                    <input type="number" id="costPerMinute" value="0.20" min="0.01" step="0.01">
+                    <div class="hint">Default $0.20/min on Prolific/CloudResearch (incl. fees)</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="nConditions">Number of Conditions</label>
+                    <input type="number" id="nConditions" value="4" min="2" max="10" step="1">
+                    <div class="hint">Total conditions including control. Assumes random allocation to power all pairwise comparisons equally.</div>
+                </div>
+            </div>
+
+            <div class="results-container">
+                <h3>Results</h3>
+
+                <div class="result-item">
+                    <div class="result-label">Optimal Number of Questions</div>
+                    <div class="result-value" id="optimalQuestions">-</div>
+                    <div class="result-detail" id="optimalDetail"></div>
+                </div>
+
+                <div class="input-row">
+                    <div class="result-item">
+                        <div class="result-label">Minimum Detectable Effect</div>
+                        <div class="result-value" id="optimalMDE">-</div>
+                        <div class="result-detail">Cohen's d (80% power, α = 0.05)</div>
+                    </div>
+
+                    <div class="result-item">
+                        <div class="result-label">Sample Size</div>
+                        <div class="result-value" id="optimalN">-</div>
+                        <div class="result-detail" id="nDetail"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chart-container">
+                <canvas id="mdeChart"></canvas>
+            </div>
+
+            <div id="budget-table-container" style="display: none;">
+                <h3>Budget Sensitivity</h3>
+                <p class="table-subtitle">How results change with different budgets</p>
+                <table id="budget-table">
+                    <thead>
+                        <tr>
+                            <th>Budget</th>
+                            <th>Optimal Number of Questions</th>
+                            <th>MDE</th>
+                            <th>Sample Size</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budget-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="github-link">
+            <a href="https://github.com/cxart" target="_blank">
+                <i class="fab fa-github"></i> View code on GitHub
+            </a>
+        </div>
+
+        <div class="footer">
+            Carter Allen, 2025
+            <br>
+            Based on power analysis for <a href="https://forecastingresearch.org/" target="_blank">FRI</a> studies
+        </div>
+    </div>
+
+    <script>
+        let chart = null;
+
+        // Calculate MDE for two-sample t-test (pooled comparison)
+        function calcMDE(n1, n2, alpha = 0.05, power = 0.80) {
+            // Using approximation: d ≈ (z_alpha + z_beta) * sqrt(1/n1 + 1/n2)
+            // z_alpha (two-tailed, 0.05) ≈ 1.96
+            // z_beta (80% power) ≈ 0.84
+            const z_alpha = 1.96;
+            const z_beta = 0.84;
+            return (z_alpha + z_beta) * Math.sqrt(1/n1 + 1/n2);
+        }
+
+        // Calculate cost per participant
+        function calcCostPerParticipant(nQuestions, baseTime, timePerQ, costPerMin) {
+            const totalTime = baseTime + nQuestions * timePerQ;
+            return totalTime * costPerMin;
+        }
+
+        // Calculate effective MDE given all parameters
+        function calcEffectiveMDE(budget, nQuestions, rho, nConditions, baseTime, timePerQ, costPerMin) {
+            const costPP = calcCostPerParticipant(nQuestions, baseTime, timePerQ, costPerMin);
+            const totalN = Math.floor(budget / costPP);
+            const nPerGroup = Math.floor(totalN / nConditions);
+
+            if (nPerGroup < 5) return { mde: Infinity, totalN: 0, nPerGroup: 0, costPP: costPP };
+
+            // Pooled comparison: (nConditions - 1) treatment groups vs 1 control
+            const nTreatmentGroups = nConditions - 1;
+            const nControl = nPerGroup;
+            const nTreatment = nPerGroup * nTreatmentGroups;
+
+            // Variance reduction factor
+            const varFactor = (1 + (nQuestions - 1) * rho) / nQuestions;
+
+            // Base MDE (no aggregation)
+            const baseMDE = calcMDE(nTreatment, nControl);
+
+            // Effective MDE with variance reduction
+            const effectiveMDE = baseMDE * Math.sqrt(varFactor);
+
+            return {
+                mde: effectiveMDE,
+                totalN: totalN,
+                nPerGroup: nPerGroup,
+                costPP: costPP
+            };
+        }
+
+        // Find optimal number of questions
+        function findOptimal(budget, rho, nConditions, baseTime, timePerQ, costPerMin) {
+            let bestMDE = Infinity;
+            let bestNQ = 1;
+            let bestResult = null;
+
+            for (let nq = 1; nq <= 30; nq++) {
+                const result = calcEffectiveMDE(budget, nq, rho, nConditions, baseTime, timePerQ, costPerMin);
+                if (result.mde < bestMDE && result.nPerGroup >= 10) {
+                    bestMDE = result.mde;
+                    bestNQ = nq;
+                    bestResult = result;
+                }
+            }
+
+            return { nQuestions: bestNQ, ...bestResult };
+        }
+
+        // Generate data for chart
+        function generateChartData(budget, rho, nConditions, baseTime, timePerQ, costPerMin) {
+            const rhoValues = [
+                Math.min(1, rho + 0.2),
+                Math.min(1, rho + 0.1),
+                rho,
+                Math.max(0, rho - 0.1),
+                Math.max(0, rho - 0.2)
+            ];
+
+            const datasets = [];
+            // Plasma color palette (viridis) - reversed for high to low
+            const colors = ['#f0f921', '#f89540', '#cc4778', '#7e03a8', '#0d0887'];
+
+            const nQuestionsRange = [];
+            for (let nq = 1; nq <= 12; nq++) {
+                nQuestionsRange.push(nq);
+            }
+
+            rhoValues.forEach((r, i) => {
+                const data = nQuestionsRange.map(nq => {
+                    const result = calcEffectiveMDE(budget, nq, r, nConditions, baseTime, timePerQ, costPerMin);
+                    return result.mde === Infinity ? null : result.mde;
+                });
+
+                datasets.push({
+                    label: `ρ = ${r.toFixed(2)}`,
+                    data: data,
+                    borderColor: colors[i],
+                    backgroundColor: colors[i],
+                    borderWidth: i === 2 ? 3 : 2,
+                    borderDash: i === 2 ? [] : [5, 5],
+                    pointRadius: i === 2 ? 3 : 2,
+                    pointStyle: 'circle',
+                    tension: 0.1
+                });
+            });
+
+            return { labels: nQuestionsRange, datasets: datasets };
+        }
+
+        // Update calculations and chart
+        function updateCalculator() {
+            const budgetInput = document.getElementById('budget').value;
+            const budget = parseFloat(budgetInput);
+
+            // If no budget entered, show placeholder message
+            if (!budgetInput || isNaN(budget) || budget <= 0) {
+                document.getElementById('optimalQuestions').textContent = '-';
+                document.getElementById('optimalMDE').textContent = '-';
+                document.getElementById('optimalN').textContent = '-';
+                document.getElementById('optimalDetail').textContent = 'Enter a study budget to see results';
+                document.getElementById('nDetail').textContent = '';
+
+                // Clear chart if it exists
+                if (chart) {
+                    chart.destroy();
+                    chart = null;
+                }
+                // Hide budget table
+                document.getElementById('budget-table-container').style.display = 'none';
+                return;
+            }
+            const rho = parseFloat(document.getElementById('rho').value) || 0.30;
+            const timePerQ = parseFloat(document.getElementById('timePerQuestion').value) || 2.5;
+            const baseTime = parseFloat(document.getElementById('baseTime').value) || 20;
+            const costPerMin = parseFloat(document.getElementById('costPerMinute').value) || 0.20;
+            const nConditions = parseInt(document.getElementById('nConditions').value) || 4;
+
+            // Find optimal
+            const optimal = findOptimal(budget, rho, nConditions, baseTime, timePerQ, costPerMin);
+
+            // Update results
+            document.getElementById('optimalQuestions').textContent = optimal.nQuestions;
+            document.getElementById('optimalMDE').textContent = optimal.mde.toFixed(3);
+            document.getElementById('optimalN').textContent = optimal.totalN;
+            document.getElementById('optimalDetail').textContent =
+                `$${optimal.costPP.toFixed(2)}/participant, ${optimal.nPerGroup} per condition`;
+            document.getElementById('nDetail').textContent =
+                `${optimal.nPerGroup} per condition × ${nConditions} conditions`;
+
+            // Update chart
+            const chartData = generateChartData(budget, rho, nConditions, baseTime, timePerQ, costPerMin);
+
+            if (chart) {
+                chart.data = chartData;
+                chart.update();
+            } else {
+                const ctx = document.getElementById('mdeChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        layout: {
+                            padding: {
+                                right: 20
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'MDE by Number of Questions',
+                                font: {
+                                    family: 'Georgia',
+                                    size: 16,
+                                    weight: 'normal'
+                                }
+                            },
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    padding: 12,
+                                    boxWidth: 5,
+                                    boxHeight: 5,
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Number of Forecasting Questions'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Minimum Detectable Effect (Cohen\'s d)'
+                                },
+                                min: 0
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Update budget sensitivity table
+            updateBudgetTable(budget, rho, nConditions, baseTime, timePerQ, costPerMin);
+        }
+
+        // Update budget sensitivity table
+        function updateBudgetTable(budget, rho, nConditions, baseTime, timePerQ, costPerMin) {
+            const multipliers = [0.75, 0.90, 1.0, 1.10, 1.25];
+            const labels = ['-25%', '-10%', '', '+10%', '+25%'];
+
+            const tbody = document.getElementById('budget-table-body');
+            tbody.innerHTML = '';
+
+            multipliers.forEach((mult, i) => {
+                const testBudget = Math.round(budget * mult);
+                const result = findOptimal(testBudget, rho, nConditions, baseTime, timePerQ, costPerMin);
+
+                const row = document.createElement('tr');
+                if (mult === 1.0) {
+                    row.className = 'current-budget';
+                }
+
+                const budgetLabel = mult === 1.0 ?
+                    `$${testBudget.toLocaleString()}` :
+                    `$${testBudget.toLocaleString()}`;
+
+                row.innerHTML = `
+                    <td>${budgetLabel}</td>
+                    <td>${result.nQuestions}</td>
+                    <td>${result.mde.toFixed(3)}</td>
+                    <td>${result.totalN}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            document.getElementById('budget-table-container').style.display = 'block';
+        }
+
+        // Add event listeners to all inputs
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updateCalculator);
+        });
+
+        // Apply accent color to links
+        function applyAccentColor() {
+            const savedColor = localStorage.getItem('accentColor');
+            if (savedColor) {
+                const links = document.getElementsByTagName("a");
+                for (let i = 0; i < links.length; i++) {
+                    links[i].style.color = savedColor;
+                }
+            }
+        }
+
+        // Initial calculation
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCalculator();
+            applyAccentColor();
+        });
+    </script>
+</body>
+</html>

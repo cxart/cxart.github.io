@@ -9,31 +9,30 @@
         gtag('js', new Date());
         gtag('config', 'G-XY6XJG6CRG');
     </script>
-    
+
     <title>carter allen | home</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400&family=Georgia&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Georgia&display=swap" rel="stylesheet">
+
     <script>
         const images = ["its_me.jpg", "its_me2.jpg", "its_me3.JPG", "its_me5.JPG",
                  "its_me9.jpg", "its_me10.PNG", "its_me11.jpg"];
         const colors = ["#55a366", "#9440a3", "#035c00", "#3245c0",
                  "#787878", "#78012f", "#eb5802"];
-                 
+
+        let currentColorIndex = 0;
+
         function setImageAndColor(){
             const rand = Math.floor(Math.random() * images.length);
+            currentColorIndex = rand;
             const image = document.getElementById("me");
             const imageName = images[rand];
             image.src = imageName;
-            
-            // Apply accent color to links
-            const links = document.getElementsByTagName("a");
-            for (let i = 0; i < links.length; i++) {
-                links[i].style.color = colors[rand];
-            }
-            
+
+            applyAccentColor();
+
             // Show caption for its_me11.jpg
             const caption = document.getElementById("photo-caption");
             if (imageName === "its_me11.jpg") {
@@ -42,6 +41,43 @@
                 caption.style.display = "none";
             }
         }
+
+        function applyAccentColor() {
+            const links = document.getElementsByTagName("a");
+            for (let i = 0; i < links.length; i++) {
+                links[i].style.color = colors[currentColorIndex];
+            }
+            // Also apply to buttons and other accent elements
+            document.documentElement.style.setProperty('--accent-color', colors[currentColorIndex]);
+            // Save to localStorage for other pages
+            localStorage.setItem('accentColor', colors[currentColorIndex]);
+        }
+
+        function showTools() {
+            document.getElementById('home-content').style.display = 'none';
+            document.getElementById('tools-content').style.display = 'block';
+            document.getElementById('header-title').textContent = 'tools';
+            document.getElementById('header-subtitle').textContent = 'a few research utilities';
+            document.getElementById('nav-home').style.display = 'none';
+            document.getElementById('nav-tools').style.display = 'inline';
+            document.title = 'carter allen | tools';
+            applyAccentColor();
+            // Generate initial EA org name if empty
+            if (!document.getElementById('generatedName').textContent) {
+                generateOne();
+            }
+        }
+
+        function showHome() {
+            document.getElementById('tools-content').style.display = 'none';
+            document.getElementById('home-content').style.display = 'block';
+            document.getElementById('header-title').textContent = 'carter allen';
+            document.getElementById('header-subtitle').textContent = 'carterallen [at] berkeley [dot] edu';
+            document.getElementById('nav-tools').style.display = 'none';
+            document.getElementById('nav-home').style.display = 'inline';
+            document.title = 'carter allen | home';
+            applyAccentColor();
+        }
     </script>
 
     <style>
@@ -49,8 +85,10 @@
             --bg-color: #ffffff;
             --text-color: #000000;
             --secondary-text: #787878;
+            --accent-color: #3245c0;
+            --border-color: #e0e0e0;
         }
-        
+
         body {
             background-color: var(--bg-color);
             display: flex;
@@ -64,7 +102,7 @@
             color: var(--text-color);
             line-height: 1.6;
         }
-        
+
         img {
             max-width: 100%;
             height: auto;
@@ -72,11 +110,11 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             transition: transform 0.3s ease;
         }
-        
+
         img:hover {
             transform: scale(1.02);
         }
-        
+
         #header {
             display: flex;
             align-items: center;
@@ -86,31 +124,35 @@
             justify-content: center;
             gap: 40px;
         }
-        
+
         #header h1 {
             font-family: Georgia, 'Times New Roman', Times, serif;
             font-weight: normal;
             font-size: 3.5rem;
             margin: 0;
+            transition: all 0.3s ease;
         }
-        
+
         #header h2 {
             font-family: 'Open Sans', Arial, sans-serif;
             font-weight: normal;
             font-size: 1rem;
             margin-top: 5px;
             color: var(--secondary-text);
+            transition: all 0.3s ease;
         }
-        
+
         #header-text {
             text-align: center;
+            min-width: 320px;
         }
-        
+
         #image-container {
             position: relative;
             text-align: center;
+            transition: opacity 0.3s ease;
         }
-        
+
         #photo-caption {
             display: none;
             margin-top: 10px;
@@ -118,7 +160,28 @@
             color: var(--secondary-text);
             font-style: italic;
         }
-        
+
+        nav {
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        nav a {
+            margin: 0 15px;
+            font-size: 1rem;
+            font-weight: 400;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-bottom: 1px dotted currentColor;
+            cursor: pointer;
+        }
+
+        nav a:hover {
+            border-bottom: 1px solid currentColor;
+            opacity: 0.9;
+        }
+
         #content {
             max-width: 720px;
             width: 100%;
@@ -129,18 +192,22 @@
             font-weight: 300;
             box-sizing: border-box;
         }
-        
+
+        a {
+            font-weight: 400;
+        }
+
         #content a {
             text-decoration: none;
             transition: all 0.2s ease;
             border-bottom: 1px dotted currentColor;
         }
-        
+
         #content a:hover {
             border-bottom: 1px solid currentColor;
             opacity: 0.9;
         }
-        
+
         .footer {
             color: var(--secondary-text);
             font-size: 0.8rem;
@@ -148,12 +215,107 @@
             margin-top: 40px;
             padding: 20px 0;
         }
-        
+
         .refresh-text {
             margin-top: 10px;
             font-style: italic;
         }
-        
+
+        /* Tools styles */
+        #tools-content {
+            display: none;
+            max-width: 800px;
+            width: 100%;
+            padding: 0 20px;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        .tool-card {
+            background: #fafafa;
+            border-radius: 10px;
+            padding: 25px 30px;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: box-shadow 0.2s ease;
+        }
+
+        .tool-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+
+        .tool-card h3 {
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-weight: normal;
+            font-size: 1.1rem;
+            margin: 0 0 10px 0;
+            color: var(--accent-color);
+        }
+
+        .tool-card h3 a {
+            border-bottom: none;
+            color: var(--accent-color);
+        }
+
+        .tool-card h3 a:hover {
+            border-bottom: 1px solid currentColor;
+        }
+
+        .tool-card p {
+            margin: 0 0 15px 0;
+            color: #444;
+        }
+
+        .tool-card .tag {
+            display: inline-block;
+            background: #e8e8e8;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: var(--secondary-text);
+            margin-right: 8px;
+        }
+
+        .tool-card .external-link {
+            font-size: 0.85rem;
+        }
+
+        /* EA Org Generator Styles */
+        .generator-container {
+            margin-top: 15px;
+        }
+
+        .generated-name {
+            font-size: 1.2rem;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            color: var(--accent-color);
+            padding: 15px;
+            background: #f5f7fa;
+            border-radius: 5px;
+            text-align: center;
+            min-height: 1.5em;
+        }
+
+        .generator-btn-inline {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            transform: rotate(4deg);
+            display: inline-block;
+            margin-left: 5px;
+        }
+
+        .generator-btn-inline:hover {
+            opacity: 0.85;
+            transform: rotate(0deg);
+        }
+
         /* For tablets & small screens */
         @media (max-width: 768px) {
             #header {
@@ -166,20 +328,29 @@
             #header h1 {
                 font-size: 2.8rem;
             }
+
+            .tool-card {
+                padding: 20px;
+            }
         }
 
         /* For very small screens, like smartphones */
         @media (max-width: 480px) {
-            #content {
+            #content, #tools-content {
                 padding: 0 10px;
             }
 
             #header h1 {
                 font-size: 2.2rem;
             }
-            
+
             body {
                 padding: 15px;
+            }
+
+            nav a {
+                margin: 0 10px;
+                font-size: 1rem;
             }
         }
     </style>
@@ -187,49 +358,143 @@
 <body onload="setImageAndColor()">
     <div id="header">
         <div id="header-text">
-            <h1>carter allen</h1>
-            <h2>carterallen [at] berkeley [dot] edu</h2>
+            <h1 id="header-title">carter allen</h1>
+            <h2 id="header-subtitle">carterallen [at] berkeley [dot] edu</h2>
         </div>
         <div id="image-container">
             <img id="me" src="" width="220" height="220" alt="Carter Allen">
             <div id="photo-caption">Photo credit: <a href="https://lorenfryxell.com/" target="_blank">Loren Fryxell</a></div>
         </div>
     </div>
-    
-    <div id="content">
-        <p>
-            Hi, I'm Carter! I'm a second-year marketing PhD student at UC Berkeley. 
-            I research cognitive biases in probabilistic reasoning and human-AI interaction. I also work
-            part-time at the <a href="https://forecastingresearch.org/" target="_blank">Forecasting Research Institute</a>.
-            Previously, I did research at <a href="https://www.eapsychology.org/members" target="_blank">NYU</a>, the
-            <a href="https://globalprioritiesinstitute.org/" target="_blank">Global Priorities Institute</a>, and 
-            <a href="https://cushmanlab.fas.harvard.edu/" target="_blank">Harvard</a>. 
-            I'm supported by a NSF <a href="https://www.nsfgrfp.org/" target="_blank">Graduate Research Fellowship</a>.
-        </p>
 
-        <p>
-            I love meeting new people 
-            <!-- - reach out to me for a friend-me doc I made! -->
-            and have an autobiographical friend-me doc <a href="https://docs.google.com/document/d/1iS9VJXY_bObddxye1es7dpq8vq_EVkV9eJ1yP6n0m5w/edit?usp=sharing" target="_blank">here</a>.
-            In my free time I make
-            <a href="https://open.spotify.com/album/0rvNg0DnaLFg3Tv0dTbkPw?si=W_kEUxaGRJ-GuLasgujSlA" target="_blank">bad computer music</a>, occasionally 
-            <a href="https://atcarterallen.substack.com/" target="_blank">write</a> or <a href="https://github.com/cxart/" target="_blank">code</a>, 
-            and play <a href="https://www.chess.com/member/carter0172" target="_blank">chess</a>. 
-        </p>
+    <nav>
+        <span id="nav-home">
+            <a href="Allen_CV_Oct_25.pdf" target="_blank">CV</a>
+            <a onclick="showTools()">miscellaneous tools i have made</a>
+        </span>
+        <span id="nav-tools" style="display: none;">
+            <a onclick="showHome()">&larr; back to home</a>
+        </span>
+    </nav>
 
-        <p>
-            Here is my <a href="https://drive.google.com/file/d/1N7ECNP4Jpx9rYOiFt5zROX5YYIJXjYWc/view?usp=sharing" target="_blank">CV</a>.
-            Follow me on <a href="https://x.com/atcarterallen" target="_blank">twitter</a> and give me <a href="https://www.admonymous.co/atcarterallen" target="_blank">anonymous feedback</a> about how to be better.
-        </p>
+    <!-- Home Content -->
+    <div id="home-content">
+        <div id="content">
+            <p>
+                Hi, I'm Carter! I'm a second-year marketing PhD student at UC Berkeley.
+                I research judgment and decision-making under uncertainty, with a focus on forecasting and AI.
+                I also work part-time at the <a href="https://forecastingresearch.org/" target="_blank">Forecasting Research Institute</a>.
+                Previously, I did research at <a href="https://www.eapsychology.org/members" target="_blank">NYU</a>, the
+                <a href="https://globalprioritiesinstitute.org/" target="_blank">Global Priorities Institute</a>, and
+                <a href="https://cushmanlab.fas.harvard.edu/" target="_blank">Harvard</a>.
+                I'm supported by a NSF <a href="https://www.nsfgrfp.org/" target="_blank">Graduate Research Fellowship</a>.
+            </p>
+
+            <p>
+                I love meeting new people
+                <!-- - reach out to me for a friend-me doc I made! -->
+                and have an autobiographical friend-me doc <a href="https://docs.google.com/document/d/1iS9VJXY_bObddxye1es7dpq8vq_EVkV9eJ1yP6n0m5w/edit?usp=sharing" target="_blank">here</a>.
+                In my free time I make
+                <a href="https://open.spotify.com/album/0rvNg0DnaLFg3Tv0dTbkPw?si=W_kEUxaGRJ-GuLasgujSlA" target="_blank">bad computer music</a>,
+                read <a href="https://atcarterallen.substack.com/" target="_blank">blog posts</a>, and collect puzzles (send me your favorites)!
+            </p>
+
+            <p>
+                Follow me on <a href="https://x.com/atcarterallen" target="_blank">twitter</a> and give me <a href="https://www.admonymous.co/atcarterallen" target="_blank">anonymous feedback</a> about how to be better.
+            </p>
+
+            <div class="footer">
+                Carter Allen, 2025
+                <div class="refresh-text">Refresh this page for a different picture of me!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tools Content -->
+    <div id="tools-content">
+        <!-- Forecasting Questions Calculator -->
+        <div class="tool-card">
+            <h3><a href="calculator.html">How many forecasting questions should I put in my study?</a></h3>
+            <p>
+                Given a fixed budget, determine the optimal number of forecasting questions to 
+                include in a study to maximize power to detect differences between groups.
+            </p>
+            <span class="tag">Study Design</span>
+            <span class="tag">Power Analysis</span>
+        </div>
+
+        <!-- ID Mediation Code -->
+        <div class="tool-card">
+            <h3><a href="https://github.com/cxart/id_mediation/blob/main/id_mediation.R" target="_blank">Mixed-Design Mediation Code</a></h3>
+            <p>
+                R code for mediation analysis that block-bootstraps/resamples by participant rather than
+                by row. Useful for mixed designs where observations are nested within participants.
+            </p>
+            <span class="tag">R</span>
+            <span class="tag">Mediation</span>
+            <span class="tag">Data Analysis</span>
+            <br><br>
+            <a href="https://github.com/cxart/id_mediation/blob/main/id_mediation.R" target="_blank" class="external-link">
+                <i class="fab fa-github"></i> View on GitHub
+            </a>
+        </div>
+
+        <!-- EA Org Name Generator -->
+        <div class="tool-card">
+            <h3>Plausible EA Org Generator</h3>
+            <p>
+                Randomly generate the name of a hypothetical effective altruism organization. <button class="generator-btn-inline" onclick="generateOne()">Generate!</button>
+            </p>
+            <span class="tag">Effective Altruism</span>
+
+            <div class="generator-container">
+                <div class="generated-name" id="generatedName"></div>
+            </div>
+        </div>
 
         <div class="footer">
             Carter Allen, 2025
-            <div class="refresh-text">Refresh this page for a different picture of me!</div>
         </div>
     </div>
+
+    <script>
+        // EA Org Name Generator
+        const prefixes = ["Institute for", "Institute of", "Center for", "Centre for"];
+        const adjectives = ["Global", "Future", "Humanitarian", "World", "Secure", "Open", "Effective", "the Future of"];
+        const nouns = ["Progress", "Impact", "Studies", "Change", "Development", "Research", "Intelligence", "Philanthropy"];
+        const topics = ["Forecasting", "Advancement", "Humanity", "Altruism", "Development", "Progress", "Safety", "Intelligence"];
+        const suffixes = ["Institute", "Institute", "Organization", "Center", "Centre", "Foundation", "Research Center", "Research Foundation", "Labs"];
+
+        function sample(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function generateAbbreviation(name) {
+            return name.match(/[A-Z]/g).join('');
+        }
+
+        function generateName() {
+            const usePrefix = Math.random() > 0.5;
+            let name;
+
+            if (usePrefix) {
+                const prefix = sample(prefixes);
+                const topicOrNoun = sample(adjectives) + " " + sample(topics);
+                name = prefix + " " + topicOrNoun;
+            } else {
+                const mainName = sample(adjectives) + " " + sample(nouns);
+                const suffix = sample(suffixes);
+                name = mainName + " " + suffix;
+            }
+
+            const abbreviation = generateAbbreviation(name);
+            return name + " (" + abbreviation + ")";
+        }
+
+        function generateOne() {
+            const name = generateName();
+            document.getElementById('generatedName').textContent = name;
+        }
+    </script>
 </body>
 </html>
-
-
-
-
