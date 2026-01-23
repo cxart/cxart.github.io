@@ -393,8 +393,8 @@
 
                 <div class="input-group">
                     <label for="rho">Within-Participant Correlation (ρ)</label>
-                    <input type="number" id="rho" value="0.30" min="0" max="1" step="0.05">
-                    <div class="hint">Assumed within-participant correlation in accuracy across questions. Estimate based on FRI studies.</div>
+                    <input type="number" id="rho" value="0.10" min="0" max="1" step="0.01">
+                    <div class="hint">Default 0.10 based on FRI pilot studies (range: 0.06-0.12)</div>
                 </div>
             </div>
 
@@ -552,19 +552,52 @@
             return { nQuestions: bestNQ, ...bestResult };
         }
 
+        // Get a nice increment based on the rho value
+        function getNiceIncrement(rho) {
+            // Pick increment that gives good spread: use 2s, 3s, 5s, 6s, 8s, 10s
+            if (rho <= 0.08) return 0.02;
+            if (rho <= 0.15) return 0.03;
+            if (rho <= 0.25) return 0.05;
+            if (rho <= 0.40) return 0.06;
+            if (rho <= 0.55) return 0.08;
+            if (rho <= 0.75) return 0.10;
+            return 0.10;
+        }
+
+        // Generate nice rho values centered around the input rho
+        function generateRhoValues(rho) {
+            const increment = getNiceIncrement(rho);
+
+            // Round rho to nearest increment for cleaner numbers
+            const roundedRho = Math.round(rho / increment) * increment;
+
+            // Generate 5 values: +2, +1, 0, -1, -2 increments from center
+            const values = [];
+            for (let offset = 2; offset >= -2; offset--) {
+                let val = roundedRho + (offset * increment);
+                // Round to avoid floating point issues
+                val = Math.round(val * 100) / 100;
+                // Clamp to valid range
+                if (val >= 0.01 && val <= 0.99) {
+                    values.push(val);
+                }
+            }
+
+            return values;
+        }
+
         // Generate data for chart
         function generateChartData(budget, rho, nConditions, baseTime, timePerQ, costPerMin) {
-            const rhoValues = [
-                Math.min(1, rho + 0.2),
-                Math.min(1, rho + 0.1),
-                rho,
-                Math.max(0, rho - 0.1),
-                Math.max(0, rho - 0.2)
-            ];
+            const rhoValues = generateRhoValues(rho);
+
+            // Find which index is closest to the entered rho (for highlighting)
+            const roundedRho = Math.round(rho / getNiceIncrement(rho)) * getNiceIncrement(rho);
+            const centerIndex = rhoValues.findIndex(r => Math.abs(r - roundedRho) < 0.001);
 
             const datasets = [];
-            // Plasma color palette (viridis) - reversed for high to low
-            const colors = ['#f0f921', '#f89540', '#cc4778', '#7e03a8', '#0d0887'];
+            // Plasma color palette - will use as many as needed
+            const allColors = ['#f0f921', '#f89540', '#cc4778', '#7e03a8', '#0d0887'];
+            const colors = allColors.slice(0, rhoValues.length);
 
             const nQuestionsRange = [];
             for (let nq = 1; nq <= 12; nq++) {
@@ -577,14 +610,15 @@
                     return result.mde === Infinity ? null : result.mde;
                 });
 
+                const isCenter = i === centerIndex;
                 datasets.push({
                     label: `ρ = ${r.toFixed(2)}`,
                     data: data,
                     borderColor: colors[i],
                     backgroundColor: colors[i],
-                    borderWidth: i === 2 ? 3 : 2,
-                    borderDash: i === 2 ? [] : [5, 5],
-                    pointRadius: i === 2 ? 3 : 2,
+                    borderWidth: isCenter ? 3 : 2,
+                    borderDash: isCenter ? [] : [5, 5],
+                    pointRadius: isCenter ? 3 : 2,
                     pointStyle: 'circle',
                     tension: 0.1
                 });
@@ -615,7 +649,7 @@
                 document.getElementById('budget-table-container').style.display = 'none';
                 return;
             }
-            const rho = parseFloat(document.getElementById('rho').value) || 0.30;
+            const rho = parseFloat(document.getElementById('rho').value) || 0.10;
             const timePerQ = parseFloat(document.getElementById('timePerQuestion').value) || 2.5;
             const baseTime = parseFloat(document.getElementById('baseTime').value) || 20;
             const costPerMin = parseFloat(document.getElementById('costPerMinute').value) || 0.20;
