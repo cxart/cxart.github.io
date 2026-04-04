@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XY6XJG6CRG"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XY6XJG6CRG');
+    </script>
+
+    <title>survey llms</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Georgia&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --secondary-text: #787878;
+            --accent-color: #3245c0;
+            --border-color: #e0e0e0;
+            --card-bg: #fafafa;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Open Sans', Arial, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        header {
+            padding: 2rem 2rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        header nav { margin-bottom: 0.75rem; }
+
+        header nav a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-bottom: 1px dotted currentColor;
+        }
+
+        header nav a:hover { border-bottom-style: solid; }
+
+        header h1 {
+            font-family: Georgia, serif;
+            font-weight: normal;
+            font-size: 2.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        header p { color: var(--secondary-text); font-size: 0.95rem; }
+
+        /* ── Settings button ── */
+        #settings-btn {
+            position: fixed;
+            top: 1.25rem;
+            right: 1.25rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-color);
+            color: var(--secondary-text);
+            cursor: pointer;
+            font-size: 0.82rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.45rem 0.75rem;
+            z-index: 300;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            transition: border-color 0.2s, color 0.2s;
+            font-family: 'Open Sans', Arial, sans-serif;
+        }
+        #settings-btn:hover { border-color: var(--accent-color); color: var(--accent-color); }
+
+        /* ── Overlay ── */
+        #overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.25);
+            z-index: 200;
+        }
+        #overlay.open { display: block; }
+
+        /* ── Settings panel ── */
+        #settings-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 360px;
+            height: 100vh;
+            background: var(--bg-color);
+            border-left: 1px solid var(--border-color);
+            padding: 1.75rem 1.5rem;
+            overflow-y: auto;
+            z-index: 250;
+            box-shadow: -3px 0 12px rgba(0,0,0,0.08);
+            transition: right 0.3s ease;
+        }
+        #settings-panel.open { right: 0; }
+
+        .settings-title {
+            font-family: Georgia, serif;
+            font-weight: normal;
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .settings-section { margin-bottom: 1.5rem; }
+
+        .settings-section h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--secondary-text);
+            margin-bottom: 0.6rem;
+        }
+
+        .key-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .key-input {
+            flex: 1;
+            padding: 0.45rem 0.6rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.82rem;
+            font-family: monospace;
+            background: var(--bg-color);
+        }
+        .key-input:focus { outline: none; border-color: var(--accent-color); }
+
+        .btn-fetch {
+            padding: 0.45rem 0.75rem;
+            border: 1px solid var(--accent-color);
+            border-radius: 4px;
+            background: var(--accent-color);
+            color: white;
+            font-size: 0.8rem;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: 'Open Sans', Arial, sans-serif;
+        }
+        .btn-fetch:hover { opacity: 0.85; }
+
+        .key-status {
+            font-size: 0.78rem;
+            min-height: 1.1em;
+            color: var(--secondary-text);
+        }
+        .key-status.ok { color: #2a9d4e; }
+        .key-status.err { color: #c0392b; }
+
+        .settings-note {
+            font-size: 0.75rem;
+            color: var(--secondary-text);
+            margin-top: 0.35rem;
+            line-height: 1.4;
+        }
+
+        .btn-clear-keys {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #c0392b;
+            border-radius: 4px;
+            background: transparent;
+            color: #c0392b;
+            font-size: 0.82rem;
+            cursor: pointer;
+            font-family: 'Open Sans', Arial, sans-serif;
+            transition: background 0.15s, color 0.15s;
+        }
+        .btn-clear-keys:hover { background: #c0392b; color: #fff; }
+
+        .settings-divider {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 1rem 0;
+        }
+
+        /* ── Main ── */
+        main {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* ── Cards ── */
+        .card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.25rem;
+            background: var(--card-bg);
+        }
+
+        .card-title {
+            font-family: Georgia, serif;
+            font-weight: normal;
+            font-size: 1.05rem;
+            margin-bottom: 1rem;
+        }
+
+        /* ── Question ── */
+        .question-input {
+            width: 100%;
+            min-height: 90px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.95rem;
+            resize: vertical;
+            background: var(--bg-color);
+            line-height: 1.5;
+        }
+        .question-input:focus { outline: none; border-color: var(--accent-color); }
+
+        .question-row { margin-bottom: 0.85rem; }
+        .question-row:last-child { margin-bottom: 0; }
+
+        .question-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.82rem;
+            color: var(--secondary-text);
+            margin-bottom: 0.3rem;
+        }
+
+        .btn-remove-q {
+            background: none;
+            border: none;
+            color: var(--secondary-text);
+            cursor: pointer;
+            font-size: 0.78rem;
+            padding: 0;
+            font-family: 'Open Sans', Arial, sans-serif;
+        }
+        .btn-remove-q:hover { color: #c0392b; }
+
+        .btn-add-q {
+            width: 100%;
+            margin-top: 0.75rem;
+            padding: 0.45rem;
+            background: none;
+            border: 1px dashed var(--border-color);
+            border-radius: 4px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.83rem;
+            color: var(--secondary-text);
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .btn-add-q:hover { border-color: var(--accent-color); color: var(--accent-color); }
+
+        /* ── Multiple choice options ── */
+        .question-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .mc-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.78rem;
+            color: var(--secondary-text);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .mc-toggle-label input[type="checkbox"] {
+            accent-color: var(--accent-color);
+            cursor: pointer;
+            width: 0.85rem;
+            height: 0.85rem;
+        }
+
+        .mc-options {
+            margin-top: 0.5rem;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-color);
+        }
+
+        .mc-option-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .mc-num {
+            font-size: 0.78rem;
+            color: var(--secondary-text);
+            width: 1.25rem;
+            flex-shrink: 0;
+            text-align: right;
+        }
+
+        .mc-option-input {
+            flex: 1;
+            padding: 0.3rem 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.85rem;
+            background: var(--bg-color);
+        }
+        .mc-option-input:focus { outline: none; border-color: var(--accent-color); }
+
+        .btn-remove-option {
+            background: none;
+            border: none;
+            color: var(--secondary-text);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 0 0.1rem;
+            font-family: 'Open Sans', Arial, sans-serif;
+            flex-shrink: 0;
+        }
+        .btn-remove-option:hover { color: #c0392b; }
+
+        .btn-add-option {
+            width: 100%;
+            margin-top: 0.25rem;
+            padding: 0.3rem;
+            background: none;
+            border: 1px dashed var(--border-color);
+            border-radius: 4px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.78rem;
+            color: var(--secondary-text);
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .btn-add-option:hover { border-color: var(--accent-color); color: var(--accent-color); }
+
+        /* ── Provider sections ── */
+        .provider-section { margin-bottom: 1.1rem; }
+        .provider-section:last-child { margin-bottom: 0; }
+
+        .provider-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.6rem;
+        }
+
+        /* Toggle switch */
+        .toggle-wrap { position: relative; width: 2.4rem; height: 1.35rem; flex-shrink: 0; }
+        .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            cursor: pointer;
+            background: #ccc;
+            border-radius: 999px;
+            transition: background 0.25s;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 0.95rem;
+            height: 0.95rem;
+            top: 0.2rem;
+            left: 0.2rem;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.25s;
+        }
+        .toggle-wrap input:checked + .toggle-slider { background: var(--accent-color); }
+        .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(1.05rem); }
+        .toggle-wrap input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
+
+        .provider-name { font-weight: 600; font-size: 0.95rem; }
+        .provider-meta { font-size: 0.8rem; color: var(--secondary-text); margin-left: auto; }
+
+        /* Model chips */
+        .model-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            padding-left: 3.15rem;
+        }
+
+        .chip {
+            padding: 0.3rem 0.7rem;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            background: var(--bg-color);
+            color: var(--text-color);
+            transition: border-color 0.15s, background 0.15s, color 0.15s;
+            user-select: none;
+        }
+        .chip:hover { border-color: var(--accent-color); }
+        .chip.selected {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+        }
+
+        .no-models-msg {
+            font-size: 0.82rem;
+            color: var(--secondary-text);
+            padding-left: 3.15rem;
+            font-style: italic;
+        }
+
+        /* ── Options ── */
+        .options-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .options-row label { font-size: 0.9rem; color: var(--secondary-text); }
+
+        input[type="number"] {
+            width: 80px;
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.95rem;
+            background: var(--bg-color);
+        }
+        input[type="number"]:focus { outline: none; border-color: var(--accent-color); }
+
+        /* ── Price estimate ── */
+        #price-estimate {
+            font-size: 0.83rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.75rem 1rem;
+            background: var(--bg-color);
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.15rem 0;
+            gap: 1rem;
+        }
+
+        .price-model { color: var(--secondary-text); }
+        .price-total {
+            border-top: 1px solid var(--border-color);
+            margin-top: 0.35rem;
+            padding-top: 0.35rem;
+            font-weight: 600;
+        }
+
+        .price-note {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--secondary-text);
+        }
+
+        /* ── Generate button ── */
+        #generate-btn {
+            width: 100%;
+            padding: 0.85rem;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-bottom: 1.25rem;
+            transition: opacity 0.2s;
+        }
+        #generate-btn:hover { opacity: 0.88; }
+        #generate-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Progress ── */
+        .progress-track {
+            width: 100%;
+            height: 7px;
+            background: var(--border-color);
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 0.75rem 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-color);
+            border-radius: 999px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        #progress-status { font-size: 0.88rem; color: var(--secondary-text); }
+
+        #log-area {
+            margin-top: 0.75rem;
+            max-height: 180px;
+            overflow-y: auto;
+            font-size: 0.78rem;
+            font-family: monospace;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.6rem 0.75rem;
+            line-height: 1.5;
+        }
+
+        .log-ok { color: #2a9d4e; }
+        .log-err { color: #c0392b; }
+        .log-info { color: var(--secondary-text); }
+
+        /* ── Results ── */
+        #download-btn {
+            padding: 0.7rem 1.5rem;
+            background: #2a9d4e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-family: 'Open Sans', Arial, sans-serif;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        #download-btn:hover { opacity: 0.88; }
+
+        #results-summary {
+            margin-top: 0.75rem;
+            font-size: 0.88rem;
+            color: var(--secondary-text);
+        }
+
+        /* ── Utility ── */
+        .hidden { display: none !important; }
+
+        @media (max-width: 768px) {
+            main { padding: 1.25rem 1rem; }
+            header { padding: 1.25rem 1rem 1rem; }
+            #settings-panel { width: min(360px, 92vw); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Settings toggle -->
+    <button id="settings-btn" onclick="toggleSettings()">
+        <i class="fas fa-key"></i> API Keys
+    </button>
+
+    <!-- Overlay -->
+    <div id="overlay" onclick="toggleSettings()"></div>
+
+    <!-- Settings panel -->
+    <div id="settings-panel">
+        <h2 class="settings-title">API Settings</h2>
+
+        <div class="settings-section">
+            <h3>OpenAI</h3>
+            <div class="key-row">
+                <input type="password" id="key-openai" class="key-input" placeholder="sk-...">
+                <button class="btn-fetch" onclick="saveAndFetch('openai')">Save &amp; Load</button>
+            </div>
+            <div id="status-openai" class="key-status"></div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Anthropic</h3>
+            <div class="key-row">
+                <input type="password" id="key-anthropic" class="key-input" placeholder="sk-ant-...">
+                <button class="btn-fetch" onclick="saveAndFetch('anthropic')">Save &amp; Load</button>
+            </div>
+            <div id="status-anthropic" class="key-status"></div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Google Gemini</h3>
+            <div class="key-row">
+                <input type="password" id="key-gemini" class="key-input" placeholder="AIza...">
+                <button class="btn-fetch" onclick="saveAndFetch('gemini')">Save &amp; Load</button>
+            </div>
+            <div id="status-gemini" class="key-status"></div>
+        </div>
+
+        <hr class="settings-divider">
+        <p class="settings-note">Keys are stored in your browser's localStorage and sent only to the respective APIs. They never leave your device in any other way.</p>
+
+        <hr class="settings-divider">
+        <button class="btn-clear-keys" onclick="clearAllKeys()">Clear all API keys</button>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <nav><a href="../index.html">← back to home</a></nav>
+        <h1>survey llms</h1>
+        <p>Generate free-text responses from AI models and export as CSV</p>
+    </header>
+
+    <main>
+        <!-- Questions -->
+        <div class="card">
+            <div class="card-title">Questions</div>
+            <div id="questions-container">
+                <div class="question-row">
+                    <div class="question-label">
+                        <span>Question 1</span>
+                        <div class="question-controls">
+                            <label class="mc-toggle-label">
+                                <input type="checkbox" class="mc-toggle" onchange="toggleMC(this)"> Multiple choice
+                            </label>
+                        </div>
+                    </div>
+                    <textarea class="question-input" placeholder="Type your survey question here..."></textarea>
+                    <div class="mc-options hidden">
+                        <div class="mc-option-list"></div>
+                        <button class="btn-add-option" onclick="addOption(this)">+ Add option</button>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-add-q" onclick="addQuestion()">+ Add question</button>
+        </div>
+
+        <!-- Model selection -->
+        <div class="card">
+            <div class="card-title">Models</div>
+
+            <!-- OpenAI -->
+            <div class="provider-section">
+                <div class="provider-header">
+                    <label class="toggle-wrap">
+                        <input type="checkbox" id="toggle-openai" onchange="onProviderToggle('openai')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="provider-name">OpenAI</span>
+                    <span class="provider-meta" id="meta-openai">No API key — add in settings</span>
+                </div>
+                <div id="chips-openai" class="model-chips hidden"></div>
+                <div id="nomsg-openai" class="no-models-msg">Enter your OpenAI key in settings to load models.</div>
+            </div>
+
+            <!-- Anthropic -->
+            <div class="provider-section">
+                <div class="provider-header">
+                    <label class="toggle-wrap">
+                        <input type="checkbox" id="toggle-anthropic" onchange="onProviderToggle('anthropic')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="provider-name">Anthropic (Claude)</span>
+                    <span class="provider-meta" id="meta-anthropic">No API key — add in settings</span>
+                </div>
+                <div id="chips-anthropic" class="model-chips hidden"></div>
+                <div id="nomsg-anthropic" class="no-models-msg">Enter your Anthropic key in settings to load models.</div>
+            </div>
+
+            <!-- Gemini -->
+            <div class="provider-section">
+                <div class="provider-header">
+                    <label class="toggle-wrap">
+                        <input type="checkbox" id="toggle-gemini" onchange="onProviderToggle('gemini')">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="provider-name">Google Gemini</span>
+                    <span class="provider-meta" id="meta-gemini">No API key — add in settings</span>
+                </div>
+                <div id="chips-gemini" class="model-chips hidden"></div>
+                <div id="nomsg-gemini" class="no-models-msg">Enter your Gemini key in settings to load models.</div>
+            </div>
+        </div>
+
+        <!-- Options -->
+        <div class="card">
+            <div class="card-title">Options</div>
+            <div class="options-row">
+                <label for="n-responses">Responses per model:</label>
+                <input type="number" id="n-responses" value="10" min="1" max="1000">
+                <label for="temperature" style="margin-left:1.25rem;">Temperature:</label>
+                <input type="number" id="temperature" value="1" min="0" max="2" step="0.1">
+                <span id="temp-anthropic-note" style="display:none; margin-left:0.75rem; font-size:0.78rem; color:#b07d00;">Note: Claude max temp = 1.0</span>
+            </div>
+            <div id="price-estimate">
+                <span style="color: var(--secondary-text); font-size: 0.83rem;">Select at least one model to see a cost estimate.</span>
+            </div>
+        </div>
+
+        <!-- Generate -->
+        <button id="generate-btn" onclick="generate()">Generate Responses</button>
+
+        <!-- Progress (hidden until generation starts) -->
+        <div class="card hidden" id="progress-card">
+            <div class="card-title">Progress</div>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <div id="progress-status">Starting…</div>
+            <div id="log-area"></div>
+        </div>
+
+        <!-- Results (hidden until done) -->
+        <div class="card hidden" id="results-card">
+            <div class="card-title">Results</div>
+            <button id="download-btn" onclick="downloadCSV()">
+                <i class="fas fa-download"></i> Download CSV
+            </button>
+            <div id="results-summary"></div>
+        </div>
+    </main>
+
+    <script>
+    // ─────────────────────────────────────────────
+    // State
+    // ─────────────────────────────────────────────
+    const CONCURRENCY = 5; // max parallel instances at once
+
+    const state = {
+        keys:    { openai: '', anthropic: '', gemini: '' },
+        models:  { openai: [], anthropic: [], gemini: [] },
+        selected: { openai: new Set(), anthropic: new Set(), gemini: new Set() },
+        results: [],
+        questionData: [],
+        generating: false
+    };
+
+    // ─────────────────────────────────────────────
+    // Price table: [input $/1M tokens, output $/1M tokens]
+    // Approximate — verify at platform pricing pages
+    // ─────────────────────────────────────────────
+    const PRICES = {
+        // OpenAI
+        'gpt-4.1':            [2.00,  8.00],
+        'gpt-4.1-mini':       [0.40,  1.60],
+        'gpt-4.1-nano':       [0.10,  0.40],
+        'gpt-4o':             [2.50, 10.00],
+        'gpt-4o-mini':        [0.15,  0.60],
+        'o1':                 [15.0, 60.00],
+        'o1-mini':            [3.00, 12.00],
+        'o3':                 [10.0, 40.00],
+        'o3-mini':            [1.10,  4.40],
+        'o4-mini':            [1.10,  4.40],
+        // Anthropic
+        'claude-opus-4':      [15.0, 75.00],
+        'claude-sonnet-4':    [3.00, 15.00],
+        'claude-haiku-4':     [0.80,  4.00],
+        'claude-3-5-sonnet':  [3.00, 15.00],
+        'claude-3-5-haiku':   [0.80,  4.00],
+        'claude-3-opus':      [15.0, 75.00],
+        'claude-3-haiku':     [0.25,  1.25],
+        // Gemini
+        'gemini-2.5-pro':     [1.25, 10.00],
+        'gemini-2.0-flash':   [0.10,  0.40],
+        'gemini-2.0-flash-lite': [0.075, 0.30],
+        'gemini-1.5-pro':     [1.25,  5.00],
+        'gemini-1.5-flash':   [0.075, 0.30],
+        'gemini-1.5-flash-8b':[0.0375,0.15],
+    };
+
+    function lookupPrice(modelId) {
+        if (PRICES[modelId]) return PRICES[modelId];
+        // Prefix match
+        for (const [key, val] of Object.entries(PRICES)) {
+            if (modelId.startsWith(key) || key.startsWith(modelId.split('-20')[0])) return val;
+        }
+        return null;
+    }
+
+    // ─────────────────────────────────────────────
+    // Init
+    // ─────────────────────────────────────────────
+    function init() {
+        // Apply accent colour from main site
+        const accent = localStorage.getItem('accentColor');
+        if (accent) document.documentElement.style.setProperty('--accent-color', accent);
+
+        // Load saved keys
+        for (const p of ['openai', 'anthropic', 'gemini']) {
+            const k = localStorage.getItem(`surv_key_${p}`) || '';
+            state.keys[p] = k;
+            if (k) document.getElementById(`key-${p}`).value = k;
+        }
+
+        // Load cached models
+        const cached = localStorage.getItem('surv_models');
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                const DATE_SNAP = /-\d{4}-\d{2}-\d{2}$/;
+                for (const p of ['openai', 'anthropic', 'gemini']) {
+                    if (parsed[p]?.length) {
+                        // Re-apply date filter in case cache predates it
+                        const models = p === 'openai'
+                            ? parsed[p].filter(m => !DATE_SNAP.test(m.id))
+                            : parsed[p];
+                        if (!models.length) continue;
+                        state.models[p] = models;
+                        renderChips(p);
+                        setMeta(p, `${models.length} models`);
+                        document.getElementById(`toggle-${p}`).disabled = false;
+                    }
+                }
+            } catch(e) { /* ignore */ }
+        }
+
+        updateToggles();
+        updatePriceEstimate();
+
+        document.querySelector('.question-input').addEventListener('input', updatePriceEstimate);
+        document.getElementById('n-responses').addEventListener('input', updatePriceEstimate);
+        document.getElementById('temperature').addEventListener('input', updatePriceEstimate);
+    }
+
+    // ─────────────────────────────────────────────
+    // Question management
+    // ─────────────────────────────────────────────
+    function addQuestion() {
+        const container = document.getElementById('questions-container');
+        const n = container.querySelectorAll('.question-row').length + 1;
+        const div = document.createElement('div');
+        div.className = 'question-row';
+        div.innerHTML = `
+            <div class="question-label">
+                <span>Question ${n}</span>
+                <div class="question-controls">
+                    <label class="mc-toggle-label">
+                        <input type="checkbox" class="mc-toggle" onchange="toggleMC(this)"> Multiple choice
+                    </label>
+                    <button class="btn-remove-q" onclick="removeQuestion(this)">✕ remove</button>
+                </div>
+            </div>
+            <textarea class="question-input" placeholder="Type your next question here..."></textarea>
+            <div class="mc-options hidden">
+                <div class="mc-option-list"></div>
+                <button class="btn-add-option" onclick="addOption(this)">+ Add option</button>
+            </div>
+        `;
+        container.appendChild(div);
+        div.querySelector('.question-input').addEventListener('input', updatePriceEstimate);
+        div.querySelector('.question-input').focus();
+        updatePriceEstimate();
+    }
+
+    function removeQuestion(btn) {
+        btn.closest('.question-row').remove();
+        document.querySelectorAll('.question-row').forEach((r, i) => {
+            r.querySelector('.question-label span').textContent = `Question ${i + 1}`;
+        });
+        updatePriceEstimate();
+    }
+
+    // ── Multiple choice helpers ──
+    function toggleMC(checkbox) {
+        const mcOptions = checkbox.closest('.question-row').querySelector('.mc-options');
+        if (checkbox.checked) {
+            mcOptions.classList.remove('hidden');
+            if (!mcOptions.querySelector('.mc-option-row')) {
+                addNewOptionRow(mcOptions);
+                addNewOptionRow(mcOptions);
+            }
+        } else {
+            mcOptions.classList.add('hidden');
+        }
+        updatePriceEstimate();
+    }
+
+    function addOption(btn) {
+        addNewOptionRow(btn.closest('.mc-options'));
+        updatePriceEstimate();
+    }
+
+    function addNewOptionRow(mcOptions) {
+        const list = mcOptions.querySelector('.mc-option-list');
+        const n = list.querySelectorAll('.mc-option-row').length + 1;
+        const div = document.createElement('div');
+        div.className = 'mc-option-row';
+        div.innerHTML = `
+            <span class="mc-num">${n}.</span>
+            <input type="text" class="mc-option-input" placeholder="Option ${n}">
+            <button class="btn-remove-option" onclick="removeOption(this)">✕</button>
+        `;
+        list.appendChild(div);
+        div.querySelector('.mc-option-input').addEventListener('input', updatePriceEstimate);
+        return div;
+    }
+
+    function removeOption(btn) {
+        const list = btn.closest('.mc-option-list');
+        btn.closest('.mc-option-row').remove();
+        list.querySelectorAll('.mc-option-row').forEach((r, i) => {
+            r.querySelector('.mc-num').textContent = `${i + 1}.`;
+            r.querySelector('.mc-option-input').placeholder = `Option ${i + 1}`;
+        });
+        updatePriceEstimate();
+    }
+
+    function getQuestionData() {
+        return Array.from(document.querySelectorAll('.question-row')).map(row => {
+            const text = row.querySelector('.question-input').value.trim();
+            const mcToggle = row.querySelector('.mc-toggle');
+            const isMCChecked = mcToggle?.checked ?? false;
+            const options = isMCChecked
+                ? Array.from(row.querySelectorAll('.mc-option-input'))
+                    .map(el => el.value.trim()).filter(v => v)
+                : [];
+            const isMC = isMCChecked && options.length > 0;
+            const promptText = isMC
+                ? `${text}\n\nOptions:\n${options.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n\nRespond with ONLY the number of your chosen option. Do not include any other text.`
+                : text;
+            return { text, promptText, isMC, options };
+        }).filter(q => q.text.length > 0);
+    }
+
+    function parseMCResponse(response, numOptions) {
+        const match = response.match(/\b([1-9]\d*)\b/);
+        if (match) {
+            const num = parseInt(match[1]);
+            if (num >= 1 && num <= numOptions) return String(num);
+        }
+        return response; // fallback to raw if unparseable
+    }
+
+    // ─────────────────────────────────────────────
+    // Settings panel
+    // ─────────────────────────────────────────────
+    function toggleSettings() {
+        document.getElementById('settings-panel').classList.toggle('open');
+        document.getElementById('overlay').classList.toggle('open');
+    }
+
+    function clearAllKeys() {
+        for (const p of ['openai', 'anthropic', 'gemini']) {
+            localStorage.removeItem(`surv_key_${p}`);
+            state.keys[p] = '';
+            state.models[p] = [];
+            state.selected[p] = new Set();
+            document.getElementById(`key-${p}`).value = '';
+            document.getElementById(`chips-${p}`).innerHTML = '';
+            document.getElementById(`chips-${p}`).classList.add('hidden');
+            document.getElementById(`nomsg-${p}`).classList.remove('hidden');
+            document.getElementById(`toggle-${p}`).checked = false;
+            document.getElementById(`toggle-${p}`).disabled = true;
+            setMeta(p, '');
+            setKeyStatus(p, '', '');
+        }
+        localStorage.removeItem('surv_models');
+        updatePriceEstimate();
+    }
+
+    async function saveAndFetch(provider) {
+        const key = document.getElementById(`key-${provider}`).value.trim();
+        if (!key) { setKeyStatus(provider, 'Enter a key first.', 'err'); return; }
+
+        state.keys[provider] = key;
+        localStorage.setItem(`surv_key_${provider}`, key);
+        setKeyStatus(provider, 'Fetching models…', '');
+
+        try {
+            const models = await fetchModels(provider, key);
+            state.models[provider] = models;
+            localStorage.setItem('surv_models', JSON.stringify(state.models));
+            renderChips(provider);
+            setMeta(provider, `${models.length} models`);
+            document.getElementById(`toggle-${provider}`).disabled = false;
+            setKeyStatus(provider, `✓ ${models.length} models loaded`, 'ok');
+            updatePriceEstimate();
+        } catch(e) {
+            setKeyStatus(provider, `Error: ${e.message}`, 'err');
+        }
+    }
+
+    function setKeyStatus(provider, msg, cls) {
+        const el = document.getElementById(`status-${provider}`);
+        el.textContent = msg;
+        el.className = `key-status${cls ? ' ' + cls : ''}`;
+    }
+
+    // ─────────────────────────────────────────────
+    // Fetch model lists
+    // ─────────────────────────────────────────────
+    function formatOpenAIName(id) {
+        // o-series: o1, o3, o4, o1-mini, o1-pro, etc.
+        if (/^o\d/.test(id)) {
+            return id
+                .replace(/-mini$/, ' mini')
+                .replace(/-pro$/, ' Pro')
+                .replace(/-plus$/, ' Plus');
+        }
+        // GPT series
+        return id
+            .replace(/^gpt-/, 'GPT-')
+            .replace(/-preview(-.*)?$/, '')   // strip -preview and any trailing date
+            .replace(/-latest$/, '')          // strip -latest
+            .replace(/-turbo$/, ' Turbo')
+            .replace(/-mini$/, ' mini')
+            .replace(/-nano$/, ' nano')
+            .replace(/-pro$/, ' Pro')
+            .replace(/-plus$/, ' Plus');
+    }
+
+    function geminiSortKey(id) {
+        // Sort by major.minor version descending, then by variant (pro > flash > flash-lite)
+        const m = id.match(/gemini-(\d+)\.?(\d*)-?(.*)/);
+        if (!m) return id;
+        const major = parseInt(m[1]) || 0;
+        const minor = parseInt(m[2]) || 0;
+        const variant = m[3] || '';
+        const variantOrder = variant.startsWith('pro') ? 0 : variant.startsWith('flash-lite') ? 2 : 1;
+        // negate so higher versions sort first with localeCompare-style sort
+        return `${99-major}.${String(99-minor).padStart(2,'0')}.${variantOrder}.${variant}`;
+    }
+
+    async function fetchModels(provider, key) {
+        if (provider === 'openai') {
+            const res = await fetch('https://api.openai.com/v1/models', {
+                headers: { Authorization: `Bearer ${key}` }
+            });
+            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+            const data = await res.json();
+            const INCLUDE = ['gpt-3.5-turbo', 'gpt-4', 'gpt-5', 'o1', 'o2', 'o3', 'o4'];
+            const EXCLUDE = ['audio', 'realtime', 'tts', 'whisper', 'dall-e', 'embedding', 'instruct', 'search', 'transcribe', 'computer-use', 'codex'];
+            const DATE_SNAP = /-\d{4}-\d{2}-\d{2}$/;  // e.g. gpt-4o-2024-05-13
+            return data.data
+                .filter(m =>
+                    INCLUDE.some(p => m.id.startsWith(p)) &&
+                    !EXCLUDE.some(e => m.id.includes(e)) &&
+                    !DATE_SNAP.test(m.id)
+                )
+                .map(m => ({ id: m.id, name: formatOpenAIName(m.id) }))
+                .sort((a, b) => b.id.localeCompare(a.id))
+                .slice(0, 25);
+        }
+
+        if (provider === 'anthropic') {
+            const res = await fetch('https://api.anthropic.com/v1/models', {
+                headers: {
+                    'x-api-key': key,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true'
+                }
+            });
+            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+            const data = await res.json();
+            return (data.data || []).map(m => ({ id: m.id, name: m.display_name || m.id }));
+        }
+
+        if (provider === 'gemini') {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`
+            );
+            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+            const data = await res.json();
+            // Require "gemini-{digit}" — matches gemini-1.x, gemini-2.x, gemini-3.x etc.
+            // Excludes gemini-nano, gemini-exp-*, gemini-pro-vision, etc.
+            // Also exclude dated preview snapshots like gemini-2.5-flash-preview-04-17
+            // when a stable alias exists (identified by having no trailing date segment)
+            const allGemini = (data.models || []).filter(m =>
+                m.supportedGenerationMethods?.includes('generateContent') &&
+                /^models\/gemini-\d/.test(m.name) &&
+                /gemini/i.test(m.displayName || m.name) &&
+                !/tts/i.test(m.displayName || m.name) &&
+                !/computer.?use/i.test(m.displayName || m.name)
+            );
+            // Prefer stable alias over dated preview when both resolve to same base
+            const stableIds = new Set(
+                allGemini
+                    .map(m => m.name.replace('models/', ''))
+                    .filter(id => !/-(preview|exp)-?\d/.test(id) && !/-\d{2}-\d{2}$/.test(id) && !/-\d{3}$/.test(id))
+            );
+            return allGemini
+                .map(m => ({
+                    id: m.name.replace('models/', ''),
+                    name: m.displayName || m.name.replace('models/', ''),
+                    isSnapshot: /(preview|exp)/.test(m.name) || /-\d{3}$/.test(m.name)
+                }))
+                // Hide snapshots/previews when a stable alias exists for the same base
+                .filter(m => {
+                    if (!m.isSnapshot) return true;
+                    const base = m.id
+                        .replace(/-(preview|exp)[^/]*$/, '')
+                        .replace(/-\d{2}-\d{2}$/, '')
+                        .replace(/-\d{3}$/, '');
+                    return !stableIds.has(base);
+                })
+                .map(({ id, name }) => ({ id, name }))
+                .sort((a, b) => geminiSortKey(a.id).localeCompare(geminiSortKey(b.id)))
+                .slice(0, 20);
+        }
+
+        throw new Error('Unknown provider');
+    }
+
+    // ─────────────────────────────────────────────
+    // Chip rendering
+    // ─────────────────────────────────────────────
+    function renderChips(provider) {
+        const container = document.getElementById(`chips-${provider}`);
+        const noMsg = document.getElementById(`nomsg-${provider}`);
+        const models = state.models[provider];
+
+        if (!models.length) {
+            container.classList.add('hidden');
+            noMsg.classList.remove('hidden');
+            return;
+        }
+
+        noMsg.classList.add('hidden');
+
+        container.innerHTML = models.map(m =>
+            `<span class="chip" data-provider="${provider}" data-id="${m.id}" onclick="toggleChip(this)">${m.name}</span>`
+        ).join('');
+
+        // Restore selected state
+        container.querySelectorAll('.chip').forEach(chip => {
+            if (state.selected[provider].has(chip.dataset.id)) chip.classList.add('selected');
+        });
+
+        // Show chips only if provider toggle is on
+        if (document.getElementById(`toggle-${provider}`).checked) {
+            container.classList.remove('hidden');
+        }
+    }
+
+    function toggleChip(chip) {
+        const { provider, id } = chip.dataset;
+        if (chip.classList.toggle('selected')) {
+            state.selected[provider].add(id);
+        } else {
+            state.selected[provider].delete(id);
+        }
+        updatePriceEstimate();
+    }
+
+    function setMeta(provider, msg) {
+        document.getElementById(`meta-${provider}`).textContent = msg;
+    }
+
+    // ─────────────────────────────────────────────
+    // Provider toggles
+    // ─────────────────────────────────────────────
+    function updateToggles() {
+        for (const p of ['openai', 'anthropic', 'gemini']) {
+            const hasModels = state.models[p].length > 0;
+            const tog = document.getElementById(`toggle-${p}`);
+            tog.disabled = !hasModels;
+            onProviderToggle(p);
+        }
+    }
+
+    function onProviderToggle(provider) {
+        const tog = document.getElementById(`toggle-${provider}`);
+        const chips = document.getElementById(`chips-${provider}`);
+        const noMsg = document.getElementById(`nomsg-${provider}`);
+        const hasModels = state.models[provider].length > 0;
+
+        if (tog.checked && hasModels) {
+            chips.classList.remove('hidden');
+            noMsg.classList.add('hidden');
+        } else {
+            chips.classList.add('hidden');
+            if (!hasModels) noMsg.classList.remove('hidden');
+        }
+        updatePriceEstimate();
+    }
+
+    // ─────────────────────────────────────────────
+    // Price estimate
+    // ─────────────────────────────────────────────
+    function updatePriceEstimate() {
+        const n = parseInt(document.getElementById('n-responses').value) || 0;
+        const questionData = getQuestionData();
+        const active = getActiveModels();
+
+        const temp = parseFloat(document.getElementById('temperature').value) || 0;
+        const anthropicActive = active.some(m => m.provider === 'anthropic');
+        document.getElementById('temp-anthropic-note').style.display =
+            (temp > 1 && anthropicActive) ? 'inline' : 'none';
+
+        if (!active.length || n === 0) {
+            document.getElementById('price-estimate').innerHTML =
+                '<span style="color:var(--secondary-text);font-size:0.83rem;">Select at least one model to see a cost estimate.</span>';
+            return;
+        }
+
+        // For multi-turn conversations, context grows with each question.
+        // Use promptText length (includes MC options if applicable).
+        // Fall back to a single minimal-token question if none are typed yet.
+        const OUT_PER_Q = 200;
+        let totalIn = 0, totalOut = 0, ctx = 80;
+        const qs = questionData.length > 0 ? questionData : [{ promptText: '' }];
+        for (const q of qs) {
+            const qTok = Math.ceil(q.promptText.length / 4);
+            totalIn += ctx + qTok;
+            totalOut += OUT_PER_Q;
+            ctx += qTok + OUT_PER_Q;
+        }
+
+        let rows = '';
+        let grandTotal = 0;
+        let allKnown = true;
+
+        for (const { model } of active) {
+            const price = lookupPrice(model);
+            if (price) {
+                const costPerInst = (totalIn * price[0] + totalOut * price[1]) / 1_000_000;
+                const cost = n * costPerInst;
+                grandTotal += cost;
+                rows += `<div class="price-row">
+                    <span class="price-model">${model}</span>
+                    <span>${n} × ${fmtCost(costPerInst)}/instance = <strong>${fmtCost(cost)}</strong></span>
+                </div>`;
+            } else {
+                allKnown = false;
+                rows += `<div class="price-row">
+                    <span class="price-model">${model}</span>
+                    <span style="color:var(--secondary-text)">price unknown</span>
+                </div>`;
+            }
+        }
+
+        if (active.length > 1 && allKnown) {
+            rows += `<div class="price-row price-total">
+                <span>Total (estimated)</span>
+                <span>${fmtCost(grandTotal)}</span>
+            </div>`;
+        }
+
+        const qLabel = qs.length === 1 ? '1 question' : `${qs.length} questions`;
+        rows += `<div class="price-note">Each instance is one conversation with ${qLabel} (~${totalIn} input + ~${totalOut} output tokens). Prices may be outdated.</div>`;
+
+        document.getElementById('price-estimate').innerHTML = rows;
+    }
+
+    function fmtCost(c) {
+        if (c < 0.0001) return '< $0.0001';
+        if (c < 0.01)   return `$${c.toFixed(5)}`;
+        if (c < 1)      return `$${c.toFixed(4)}`;
+        return `$${c.toFixed(2)}`;
+    }
+
+    function getActiveModels() {
+        const active = [];
+        for (const p of ['openai', 'anthropic', 'gemini']) {
+            if (!document.getElementById(`toggle-${p}`).checked) continue;
+            for (const id of state.selected[p]) {
+                active.push({ provider: p, model: id });
+            }
+        }
+        return active;
+    }
+
+    // ─────────────────────────────────────────────
+    // Concurrency pool
+    // ─────────────────────────────────────────────
+    async function runWithConcurrency(tasks, limit) {
+        let idx = 0;
+        async function worker() {
+            while (idx < tasks.length) { await tasks[idx++](); }
+        }
+        await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+    }
+
+    // ─────────────────────────────────────────────
+    // Generate
+    // ─────────────────────────────────────────────
+    async function generate() {
+        if (state.generating) return;
+
+        const questionData = getQuestionData();
+        if (!questionData.length) { alert('Please enter at least one question.'); return; }
+
+        const n = parseInt(document.getElementById('n-responses').value) || 0;
+        if (n < 1) { alert('Please enter a valid number of responses.'); return; }
+
+        const temperature = parseFloat(document.getElementById('temperature').value) ?? 1;
+
+        const active = getActiveModels();
+        if (!active.length) { alert('Please select at least one model.'); return; }
+
+        state.results = [];
+        state.questionData = questionData;
+        state.generating = true;
+        document.getElementById('generate-btn').disabled = true;
+        document.getElementById('results-card').classList.add('hidden');
+        document.getElementById('progress-card').classList.remove('hidden');
+        document.getElementById('log-area').innerHTML = '';
+
+        const totalSteps = active.length * n * questionData.length;
+        let done = 0;
+
+        const setProgress = (msg) => {
+            document.getElementById('progress-fill').style.width = `${totalSteps ? Math.round(done / totalSteps * 100) : 0}%`;
+            document.getElementById('progress-status').textContent = msg || `${done} / ${totalSteps}`;
+        };
+
+        const log = (msg, cls = 'log-info') => {
+            const div = document.createElement('div');
+            div.className = cls;
+            div.textContent = msg;
+            const area = document.getElementById('log-area');
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
+        };
+
+        setProgress('Starting…');
+
+        // Run all models in parallel
+        await Promise.all(active.map(async ({ provider, model }) => {
+            log(`▶ ${model}  (${n} instances × ${questionData.length} Q)`);
+
+            // Each task = one independent conversation instance
+            const tasks = Array.from({ length: n }, (_, i) => async () => {
+                const instanceNum = i + 1;
+                const messages = []; // shared conversation history for this instance
+
+                for (let qi = 0; qi < questionData.length; qi++) {
+                    const qd = questionData[qi];
+                    messages.push({ role: 'user', content: qd.promptText });
+                    try {
+                        const raw = await callModel(provider, model, messages, state.keys[provider], temperature);
+                        const response = qd.isMC ? parseMCResponse(raw, qd.options.length) : raw;
+                        messages.push({ role: 'assistant', content: raw });
+                        state.results.push({
+                            provider, model,
+                            instance_number: instanceNum,
+                            question_number: qi + 1,
+                            question: qd.text,
+                            response,
+                            timestamp: new Date().toISOString()
+                        });
+                        done++;
+                        log(`  [${model} inst ${instanceNum}, Q${qi + 1}] ✓`, 'log-ok');
+                    } catch(e) {
+                        state.results.push({
+                            provider, model,
+                            instance_number: instanceNum,
+                            question_number: qi + 1,
+                            question: qd.text,
+                            response: `ERROR: ${e.message}`,
+                            timestamp: new Date().toISOString()
+                        });
+                        done++;
+                        log(`  [${model} inst ${instanceNum}, Q${qi + 1}] ✗ ${e.message}`, 'log-err');
+                        break; // can't continue a broken conversation
+                    }
+                    setProgress(`${done} / ${totalSteps}`);
+                }
+            });
+
+            await runWithConcurrency(tasks, CONCURRENCY);
+            log(`✔ ${model} complete`, 'log-ok');
+        }));
+
+        setProgress(`Done — ${done} responses collected`);
+        state.generating = false;
+        document.getElementById('generate-btn').disabled = false;
+        document.getElementById('results-card').classList.remove('hidden');
+        const ok = state.results.filter(r => !r.response.startsWith('ERROR:')).length;
+        document.getElementById('results-summary').textContent =
+            `${ok} successful responses from ${active.length} model(s). Results will be lost if you refresh.`;
+    }
+
+    // ─────────────────────────────────────────────
+    // API calls — all take a messages array for multi-turn support
+    // ─────────────────────────────────────────────
+    async function callModel(provider, model, messages, key, temperature) {
+        if (provider === 'openai')    return callOpenAI(model, messages, key, temperature);
+        if (provider === 'anthropic') return callAnthropic(model, messages, key, temperature);
+        if (provider === 'gemini')    return callGemini(model, messages, key, temperature);
+        throw new Error('Unknown provider');
+    }
+
+    async function callOpenAI(model, messages, key, temperature) {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+            body: JSON.stringify({ model, messages, temperature })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `HTTP ${res.status}`);
+        }
+        return (await res.json()).choices[0].message.content.trim();
+    }
+
+    async function callAnthropic(model, messages, key, temperature) {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            // Anthropic only accepts temperature in 0–1; clamp silently
+            body: JSON.stringify({ model, max_tokens: 1024, messages, temperature: Math.min(temperature, 1) })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `HTTP ${res.status}`);
+        }
+        return (await res.json()).content[0].text.trim();
+    }
+
+    async function callGemini(model, messages, key, temperature) {
+        // Convert OpenAI-style messages to Gemini's contents format
+        const contents = messages.map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }]
+        }));
+        const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents, generationConfig: { temperature } })
+            }
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `HTTP ${res.status}`);
+        }
+        return (await res.json()).candidates[0].content.parts[0].text.trim();
+    }
+
+    // ─────────────────────────────────────────────
+    // CSV download
+    // ─────────────────────────────────────────────
+    function downloadCSV() {
+        if (!state.results.length) return;
+
+        const esc = v => {
+            const s = String(v ?? '');
+            return (s.includes(',') || s.includes('\n') || s.includes('"'))
+                ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+
+        const maxQ = Math.max(...state.results.map(r => r.question_number));
+
+        // Build headers — MC questions get an extra _options column
+        const qCols = Array.from({ length: maxQ }, (_, i) => {
+            const qd = state.questionData[i];
+            const cols = [`question_${i + 1}`];
+            if (qd?.isMC) cols.push(`question_${i + 1}_options`);
+            cols.push(`response_${i + 1}`);
+            return cols;
+        }).flat();
+        const cols = ['provider', 'model', 'instance_number', ...qCols, 'timestamp'];
+
+        // Group results by (provider, model, instance_number) — one row per instance
+        const instanceMap = new Map();
+        const modelOrder = new Map(); // tracks first-seen order for each model
+        for (const r of state.results) {
+            const modelKey = `${r.provider}|||${r.model}`;
+            if (!modelOrder.has(modelKey)) modelOrder.set(modelKey, modelOrder.size);
+
+            const key = `${modelKey}|||${r.instance_number}`;
+            if (!instanceMap.has(key)) {
+                instanceMap.set(key, {
+                    provider: r.provider, model: r.model,
+                    instance_number: r.instance_number,
+                    qs: {}, rs: {}, timestamp: r.timestamp
+                });
+            }
+            const inst = instanceMap.get(key);
+            inst.qs[r.question_number] = r.question;
+            inst.rs[r.question_number] = r.response;
+            inst.timestamp = r.timestamp;
+        }
+
+        const sortedInstances = Array.from(instanceMap.values()).sort((a, b) => {
+            const mo = modelOrder.get(`${a.provider}|||${a.model}`) - modelOrder.get(`${b.provider}|||${b.model}`);
+            if (mo !== 0) return mo;
+            return a.instance_number - b.instance_number;
+        });
+
+        const csvRows = [
+            cols.join(','),
+            ...sortedInstances.map(inst => [
+                esc(inst.provider), esc(inst.model), esc(inst.instance_number),
+                ...Array.from({ length: maxQ }, (_, i) => {
+                    const qd = state.questionData[i];
+                    const vals = [esc(inst.qs[i + 1] ?? '')];
+                    if (qd?.isMC) vals.push(esc(qd.options.join('; ')));
+                    vals.push(esc(inst.rs[i + 1] ?? ''));
+                    return vals;
+                }).flat(),
+                esc(inst.timestamp)
+            ].join(','))
+        ];
+
+        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `survey_llm_${new Date().toISOString().slice(0,19).replace(/[:.]/g, '-')}.csv`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+
+    // ─────────────────────────────────────────────
+    // Boot
+    // ─────────────────────────────────────────────
+    init();
+    </script>
+</body>
+</html>
