@@ -456,6 +456,8 @@ function mountSliders(tag) {
 // ═══════════════════════════════════════════════════════════════
 
 const pages = [];
+const COMP1_CORRECT = 'If any one team member publishes the finding, the finding will be public regardless of what the other team members choose to do';
+const COMP2_CORRECT = 'Publishing is highly likely to save lives, but there is a remote possibility of catastrophic misuse';
 
 // ── 0  Consent / intro ────────────────────────────────
 pages.push({
@@ -519,14 +521,14 @@ pages.push({
     </div>
     <div style="margin-top:28px;"></div>
     ${mcHTML('comp1', 'Which of the following is correct?', shuffle([
-      'If any one team member publishes the finding, the finding will be public regardless of what the other team members choose to do',
+      COMP1_CORRECT,
       'All three team members must agree to publish in order for the finding to be public',
       'Publishing requires more effort than not publishing',
       'Team members can discuss their plans before deciding',
     ]))}
     <div style="margin-top:24px;"></div>
     ${mcHTML('comp2', 'Which best describes the finding?', shuffle([
-      'Publishing is highly likely to save lives, but there is a remote possibility of catastrophic misuse',
+      COMP2_CORRECT,
       'It is unclear whether publishing would have any benefit at all',
       'Publishing is certain to cause harm',
       'The finding has no medical value',
@@ -774,14 +776,99 @@ function goTo(idx) {
 // ═══════════════════════════════════════════════════════════════
 
 function submitData() {
-  const data = {
-    participant_id:  S.pid,
-    start_time:      S.startTime,
-    version:         S.version,
+  const passedCompChecksPage1 =
+    (S.resp.comp1 === COMP1_CORRECT && S.resp.comp2 === COMP2_CORRECT) ? 1 : 0;
+
+  // Canonical schema + order so every row maps to the same columns in Sheets.
+  const orderedKeys = [
+    'participant_id',
+    'start_time',
+    'version',
+    'condition_order',
+    'comp1',
+    'comp2',
+    'passed_comp_checks_page1',
+    'comp3_A_1pct',
+    'comp3_A_99pct',
+    'comp3_B_1pct',
+    'comp3_B_99pct',
+    'comp3_C_1pct',
+    'comp3_C_99pct',
+    'dv_A_1pct_publish',
+    'dv_A_1pct_nopub',
+    'dv_A_99pct_publish',
+    'dv_A_99pct_nopub',
+    'dv_B_1pct_publish',
+    'dv_B_1pct_nopub',
+    'dv_B_99pct_publish',
+    'dv_B_99pct_nopub',
+    'dv_C_1pct_publish',
+    'dv_C_1pct_nopub',
+    'dv_C_99pct_publish',
+    'dv_C_99pct_nopub',
+    'rc_1pct_concern',
+    'rc_1pct_worrying',
+    'rc_1pct_calm',
+    'rc_1pct_reassurance',
+    'rc_99pct_concern',
+    'rc_99pct_worrying',
+    'rc_99pct_calm',
+    'rc_99pct_reassurance',
+    'rc_item_order',
+    'reasoning',
+    'age',
+    'gender',
+    'endTime',
+    'page_times',
+  ];
+
+  const raw = {
+    participant_id: S.pid,
+    start_time: S.startTime,
+    version: S.version,
     condition_order: S.condOrder.join('_'),
-    ...S.resp,
-    page_times:      S.times,
+    comp1: S.resp.comp1,
+    comp2: S.resp.comp2,
+    passed_comp_checks_page1: passedCompChecksPage1,
+    comp3_A_1pct: S.resp.comp3_A_1pct,
+    comp3_A_99pct: S.resp.comp3_A_99pct,
+    comp3_B_1pct: S.resp.comp3_B_1pct,
+    comp3_B_99pct: S.resp.comp3_B_99pct,
+    comp3_C_1pct: S.resp.comp3_C_1pct,
+    comp3_C_99pct: S.resp.comp3_C_99pct,
+    dv_A_1pct_publish: S.resp.dv_A_1pct_publish,
+    dv_A_1pct_nopub: S.resp.dv_A_1pct_nopub,
+    dv_A_99pct_publish: S.resp.dv_A_99pct_publish,
+    dv_A_99pct_nopub: S.resp.dv_A_99pct_nopub,
+    dv_B_1pct_publish: S.resp.dv_B_1pct_publish,
+    dv_B_1pct_nopub: S.resp.dv_B_1pct_nopub,
+    dv_B_99pct_publish: S.resp.dv_B_99pct_publish,
+    dv_B_99pct_nopub: S.resp.dv_B_99pct_nopub,
+    dv_C_1pct_publish: S.resp.dv_C_1pct_publish,
+    dv_C_1pct_nopub: S.resp.dv_C_1pct_nopub,
+    dv_C_99pct_publish: S.resp.dv_C_99pct_publish,
+    dv_C_99pct_nopub: S.resp.dv_C_99pct_nopub,
+    rc_1pct_concern: S.resp.rc_1pct_concern,
+    rc_1pct_worrying: S.resp.rc_1pct_worrying,
+    rc_1pct_calm: S.resp.rc_1pct_calm,
+    rc_1pct_reassurance: S.resp.rc_1pct_reassurance,
+    rc_99pct_concern: S.resp.rc_99pct_concern,
+    rc_99pct_worrying: S.resp.rc_99pct_worrying,
+    rc_99pct_calm: S.resp.rc_99pct_calm,
+    rc_99pct_reassurance: S.resp.rc_99pct_reassurance,
+    rc_item_order: S.resp.rc_item_order || [],
+    reasoning: S.resp.reasoning,
+    age: S.resp.age,
+    gender: S.resp.gender,
+    endTime: S.resp.endTime,
+    page_times: S.times,
   };
+
+  const data = {};
+  for (const key of orderedKeys) {
+    const val = raw[key];
+    data[key] = (val === undefined || val === null) ? '' : val;
+  }
 
   // QA shortcut: entering exactly "test123" in reasoning skips all saving.
   if (data.reasoning === 'test123') {
