@@ -164,7 +164,7 @@ table.mx input[type=radio] {
 // ═══════════════════════════════════════════════════════════════
 // GOOGLE SHEETS SUBMISSION — paste your Apps Script web app URL below
 // ═══════════════════════════════════════════════════════════════
-const SHEET_URL = 'https://script.google.com/a/macros/berkeley.edu/s/AKfycbxwgCUQn_gTuU-2WGFwifnM_u2tEaXs_44chBqI28iYceLa62QEaGpV8tVH7Zlu_sKO/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxwgCUQn_gTuU-2WGFwifnM_u2tEaXs_44chBqI28iYceLa62QEaGpV8tVH7Zlu_sKO/exec';
 const COMPLETION_URL = '';  // paste your Prolific / Cloud Research completion link here
 
 // ═══════════════════════════════════════════════════════════════
@@ -791,22 +791,50 @@ function submitData() {
   console.log('UNILATERALISM_U_RESPONSE', JSON.stringify(data, null, 2));
 
   // ── Google Sheets (Apps Script web app) ───────────
-  // Uses form-encoded POST — avoids URL-length limits and redirect issues with no-cors
+  // Match garden-game transport: raw JSON body + readable JSON response.
+  // Fallback to legacy payload transport for older Apps Script parsers.
   if (SHEET_URL) {
-    fetch(SHEET_URL, {
+    const el = document.getElementById('submit-status');
+    if (el) el.textContent = 'Saving responses...';
+
+    const checkResponse = async (res) => {
+      const raw = await res.text();
+      let out = null;
+      try { out = raw ? JSON.parse(raw) : null; } catch (_) {}
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (out?.status === 'error') throw new Error(out.message || 'Server returned error status');
+      if (!out && /^\s*Error:/i.test(raw)) throw new Error(raw.trim());
+    };
+
+    const postJSON = () => fetch(SHEET_URL, {
       method: 'POST',
-      mode: 'no-cors',
-      body: new URLSearchParams({ payload: JSON.stringify(data) }),
-    })
-    .then(() => {
-      const el = document.getElementById('submit-status');
-      if (el) el.textContent = '✓ Responses recorded.';
-    })
-    .catch(e => {
-      console.error('Submission error:', e);
-      const el = document.getElementById('submit-status');
-      if (el) el.textContent = 'Note: could not reach server — your responses are saved locally.';
+      body: JSON.stringify(data),
+      keepalive: true,
     });
+
+    const postLegacyPayload = () => fetch(SHEET_URL, {
+      method: 'POST',
+      body: new URLSearchParams({ payload: JSON.stringify(data) }),
+      keepalive: true,
+    });
+
+    postJSON()
+      .then(checkResponse)
+      .then(() => {
+        if (el) el.textContent = '✓ Responses recorded.';
+      })
+      .catch(async (jsonErr) => {
+        console.warn('JSON submission failed, retrying legacy payload format:', jsonErr);
+        try {
+          const legacyRes = await postLegacyPayload();
+          await checkResponse(legacyRes);
+          if (el) el.textContent = '✓ Responses recorded.';
+        } catch (legacyErr) {
+          console.error('Submission error:', legacyErr);
+          if (el) el.textContent = 'Note: could not reach server — your responses are saved locally.';
+        }
+      });
   }
 }
 
