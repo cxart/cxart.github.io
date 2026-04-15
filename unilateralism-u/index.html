@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research Study</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a1a;
+  line-height: 1.65;
+  min-height: 100vh;
+  /* Prevent text selection to discourage LLM copy-paste */
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Re-enable selection inside form inputs only */
+input, textarea { user-select: text; -webkit-user-select: text; }
+
+#shell {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 16px 80px;
+}
+
+/* ── progress ── */
+#prog-wrap {
+  position: sticky; top: 0;
+  background: #f0f2f5;
+  padding: 14px 0 6px;
+  z-index: 100;
+}
+#prog-track { height: 6px; background: #d0d5dd; border-radius: 3px; }
+#prog-fill  { height: 100%; background: #3b6fc4; border-radius: 3px;
+              width: 0%; transition: width .35s ease; }
+#prog-label { font-size: 12px; color: #667085; margin-top: 5px; text-align: right; }
+
+/* ── card ── */
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 40px 44px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+  margin-top: 20px;
+}
+
+/* ── typography ── */
+h2   { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; }
+p    { margin-bottom: 14px; }
+p:last-child { margin-bottom: 0; }
+.note { font-size: .88rem; color: #555; font-style: italic; margin-bottom: 18px; }
+
+.scenario-box {
+  border-left: 3px solid #c8cdd8;
+  padding-left: 18px;
+  color: #222;
+  margin-bottom: 28px;
+}
+
+.divider { border: none; border-top: 1px solid #eee; margin: 30px 0; }
+
+/* ── reminder box ── */
+.reminder {
+  background: #f0f4ff;
+  border: 1px solid #c5d3f5;
+  border-radius: 7px;
+  padding: 14px 18px;
+  margin-bottom: 28px;
+  font-size: .93rem;
+  line-height: 1.55;
+}
+.reminder strong.label { display: block; font-size: .8rem; text-transform: uppercase;
+                         letter-spacing: .04em; color: #3b6fc4; margin-bottom: 6px; }
+
+/* ── MC choices ── */
+.choices { margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
+.choice-lbl {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 15px;
+  border: 1.5px solid #d0d5dd; border-radius: 7px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  font-size: .95rem;
+  user-select: none;
+}
+.choice-lbl:hover    { border-color: #3b6fc4; background: #f5f8ff; }
+.choice-lbl.selected { border-color: #3b6fc4; background: #eef3fc; }
+.choice-lbl input[type=radio] { margin-top: 3px; flex-shrink: 0; accent-color: #3b6fc4; }
+
+/* ── sliders ── */
+.sl-item  { margin-bottom: 30px; }
+.sl-label { font-size: .95rem; font-weight: 500; margin-bottom: 10px; }
+.sl-label span { font-weight: 400; color: #555; }
+.sl-row   { display: flex; align-items: center; gap: 14px; }
+input[type=range] { flex: 1; height: 6px; accent-color: #3b6fc4; cursor: pointer; }
+.sl-val   { font-size: 1.15rem; font-weight: 700; color: #3b6fc4;
+            min-width: 52px; text-align: right; }
+.sl-ends  { display: flex; justify-content: space-between;
+            font-size: .78rem; color: #999; margin-top: 4px; }
+
+/* ── matrix ── */
+.matrix-outer { overflow-x: auto; margin-top: 10px; }
+table.mx { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
+/* anchor-row: "Not at all" / "A great deal" labels */
+table.mx tr.anchor-row th {
+  font-weight: 400; font-size: .78rem; color: #888;
+  padding-bottom: 2px; border: none;
+}
+table.mx tr.anchor-row th.rh { } /* empty left cell */
+table.mx tr.anchor-row .anc-left  { text-align: center; }
+table.mx tr.anchor-row .anc-right { text-align: center; }
+/* number row */
+table.mx tr.num-row th {
+  text-align: center; font-weight: 600; padding: 4px 3px; color: #444;
+}
+/* rh width on ALL rh cells so table-layout:fixed picks it up from first row */
+table.mx th.rh { width: 44%; }
+table.mx tr.num-row th.rh {
+  text-align: left; font-weight: 400; color: #555;
+}
+/* data rows */
+table.mx td { text-align: center; padding: 10px 3px; border-top: 1px solid #f2f2f2; }
+table.mx td.rl { text-align: left; padding-left: 0; padding-right: 12px; color: #222; }
+table.mx tr:hover td { background: #fafbfc; }
+table.mx input[type=radio] {
+  accent-color: #3b6fc4; width: 16px; height: 16px; cursor: pointer;
+}
+
+/* ── nav ── */
+.btn-row  { margin-top: 32px; display: flex; justify-content: flex-end; }
+.next-btn {
+  background: #3b6fc4; color: #fff; border: none; border-radius: 7px;
+  padding: 12px 36px; font-size: 1rem; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.next-btn:hover { background: #2e59a0; }
+.err-msg { color: #c0392b; font-size: .88rem; margin-top: 10px; display: none; }
+.err-msg.show { display: block; }
+
+/* ── thank you ── */
+.ty-wrap { text-align: center; padding: 48px 0 32px; }
+.ty-wrap h1 { font-size: 1.55rem; margin-bottom: 14px; }
+.ty-wrap p  { color: #555; max-width: 480px; margin: 0 auto 12px; }
+
+@media (max-width: 600px) {
+  .card { padding: 24px 18px; }
+  table.mx th, table.mx td { padding: 8px 3px; font-size: .8rem; }
+}
+</style>
+</head>
+<body>
+<div id="shell">
+  <div id="prog-wrap">
+    <div id="prog-track"><div id="prog-fill"></div></div>
+    <div id="prog-label"></div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// GOOGLE SHEETS SUBMISSION — paste your Apps Script web app URL below
+// ═══════════════════════════════════════════════════════════════
+const SHEET_URL = 'https://script.google.com/a/macros/berkeley.edu/s/AKfycbxwgCUQn_gTuU-2WGFwifnM_u2tEaXs_44chBqI28iYceLa62QEaGpV8tVH7Zlu_sKO/exec';
+const COMPLETION_URL = '';  // paste your Prolific / Cloud Research completion link here
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT
+// ═══════════════════════════════════════════════════════════════
+
+const MANIP = {
+  A: {
+    1:  `<p>Lastly, there is also some chance that the finding is already public. The web server
+where your research team stores their data and results recently experienced a cybersecurity
+attack in which some research findings were leaked. The hackers automatically uploaded
+everything they accessed directly to the same public scientific database that you would publish
+to. The owners of the server determined that there is a <strong>1% chance</strong> that your
+team's research files were included in the data leak. In that case, the research discovery is
+already publicly available, and your decision about whether to publish the finding will not make
+a difference. However, you must make your decision before you find out whether your team's
+research files were included in the leak.</p>
+<p>You cannot communicate with your teammates, and you do not know what they plan to do. If
+none of you decide to publish the results, the findings will soon be deleted to prevent any
+future researchers from accessing them. Thus, you must decide now, before finding out whether
+your team's files were included in the data leak, whether to independently publish your team's
+discovery before the findings are permanently destroyed.</p>`,
+
+    99: `<p>Lastly, there is also some chance that the finding is already public. The web server
+where your research team stores their data and results recently experienced a cybersecurity
+attack in which some research findings were leaked. The hackers automatically uploaded
+everything they accessed directly to the same public scientific database that you would publish
+to. The owners of the server determined that there is a <strong>99% chance</strong> that your
+team's research files were included in the data leak. In that case, the research discovery is
+already publicly available, and your decision about whether to publish the finding will not make
+a difference. However, you must make your decision before you find out whether your team's
+research files were included in the leak.</p>
+<p>You cannot communicate with your teammates, and you do not know what they plan to do. If
+none of you decide to publish the results, the findings will soon be deleted to prevent any
+future researchers from accessing them. Thus, you must decide now, before finding out whether
+your team's files were included in the data leak, whether to independently publish your team's
+discovery before the findings are permanently destroyed.</p>`,
+  },
+
+  B: {
+    1:  `<p>Lastly, there is also some chance that the finding cannot be made public. Your
+institution's data storage system recently suffered a critical fault. System administrators
+have determined that there is a <strong>1% chance</strong> that your team's research files
+survived the fault. If they did not survive — which is very likely — they are gone permanently,
+and nobody can publish them. If they survived — which is very unlikely — they remain intact
+and any of you can still publish them.</p>
+<p>You cannot communicate with your teammates, and you do not know what they plan to do. If
+none of you decide to publish the results, the findings will soon be deleted to prevent any
+future researchers from accessing them. Thus, you must decide now, before finding out whether
+your files survived, whether to independently publish your team's discovery before the findings
+are permanently destroyed.</p>`,
+
+    99: `<p>Lastly, there is also some chance that the finding cannot be made public. Your
+institution's data storage system recently suffered a critical fault. System administrators
+have determined that there is a <strong>99% chance</strong> that your team's research files
+survived the fault. If they survived — which is very likely — they remain intact and any of
+you can still publish them. If they did not survive — which is very unlikely — they are gone
+permanently, and nobody can publish them.</p>
+<p>You cannot communicate with your teammates, and you do not know what they plan to do. If
+none of you decide to publish the results, the findings will soon be deleted to prevent any
+future researchers from accessing them. Thus, you must decide now, before finding out whether
+your files survived, whether to independently publish your team's discovery before the findings
+are permanently destroyed.</p>`,
+  },
+
+  C: {
+    1:  `<p>Lastly, there is also some chance that you cannot make the finding public.
+Following a system failure, submission buttons have been randomly disabled for some researchers.
+System administrators have determined that there is a <strong>1% chance</strong> that your
+submission button is still active. If your button is disabled — which is very likely — pressing
+it will have no effect, and your decision makes no difference. If your button is active — which
+is very unlikely — pressing it will publish the findings immediately and permanently.</p>
+<p>You cannot communicate with your teammates, and you do not know what they plan to do. If
+none of you decide to publish the results, the findings will soon be deleted to prevent any
+future researchers from accessing them. Thus, you must decide now, before knowing whether your
+submission button works or not, whether to try to independently publish your team's discovery
+before the findings are permanently destroyed.</p>`,
+
+    99: `<p>Lastly, there is also some chance that you cannot make the finding public.
+Following a system failure, submission buttons have been randomly disabled for some researchers.
+System administrators have determined that there is a <strong>99% chance</strong> that your
+submission button is still active. If your button is active — which is very likely — pressing it
+will publish the findings immediately and permanently. If your button is disabled — which is very
+unlikely — pressing it will have no effect, and your decision makes no difference.</p>
+<p>You cannot communicate with your teammates, and you do not know what they plan to do. If
+none of you decide to publish the results, the findings will soon be deleted to prevent any
+future researchers from accessing them. Thus, you must decide now, before knowing whether your
+submission button works or not, whether to try to independently publish your team's discovery
+before the findings are permanently destroyed.</p>`,
+  },
+};
+
+// comp3 choices — first item in each array is always correct
+const COMP3 = {
+  A: {
+    1:  [
+      'There is a 1% chance the files were accessed — it is very unlikely they were accessed',
+      'There is a 99% chance the files were accessed — it is very likely they were accessed',
+      'The files were definitely accessed',
+      'The files were definitely not accessed',
+    ],
+    99: [
+      'There is a 99% chance the files were accessed — it is very likely they were accessed',
+      'There is a 1% chance the files were accessed — it is very unlikely they were accessed',
+      'The files were definitely accessed',
+      'The files were definitely not accessed',
+    ],
+  },
+  B: {
+    1:  [
+      'There is a 1% chance the files survived — it is very unlikely they survived',
+      'There is a 99% chance the files survived — it is very likely they survived',
+      'The files definitely survived the fault',
+      'The files were definitely destroyed',
+    ],
+    99: [
+      'There is a 99% chance the files survived — it is very likely they survived',
+      'There is a 1% chance the files survived — it is very unlikely they survived',
+      'The files definitely survived the fault',
+      'The files were definitely destroyed',
+    ],
+  },
+  C: {
+    1:  [
+      'There is a 1% chance my button is active — it is very unlikely it is active',
+      'There is a 99% chance my button is active — it is very likely it is active',
+      'My button is definitely active',
+      'My button is definitely disabled',
+    ],
+    99: [
+      'There is a 99% chance my button is active — it is very likely it is active',
+      'There is a 1% chance my button is active — it is very unlikely it is active',
+      'My button is definitely active',
+      'My button is definitely disabled',
+    ],
+  },
+};
+
+// Short DV-page reminders (condition-specific second line)
+const REMINDERS = {
+  A: {
+    1:  'There is also a <strong>1% chance</strong> that your files were included in a data leak — meaning it is very likely that your decision matters.',
+    99: 'There is also a <strong>99% chance</strong> that your files were included in a data leak — meaning it is very unlikely that your decision matters.',
+  },
+  B: {
+    1:  'There is also a <strong>1% chance</strong> that your files survived a data storage system fault — meaning it is very unlikely that your decision matters.',
+    99: 'There is also a <strong>99% chance</strong> that your files survived a data storage system fault — meaning it is very likely that your decision matters.',
+  },
+  C: {
+    1:  'There is also a <strong>1% chance</strong> that your submission button is still active — meaning it is very unlikely that your decision matters.',
+    99: 'There is also a <strong>99% chance</strong> that your submission button is still active — meaning it is very likely that your decision matters.',
+  },
+};
+
+const RC_ITEMS = [
+  { key: 'concern',     text: 'Concern that my decision would be consequential.' },
+  { key: 'worrying',   text: 'Worrying about how important my decision would be.' },
+  { key: 'calm',       text: 'Feeling calm because my decision was relatively unimportant.' },
+  { key: 'reassurance',text: 'Reassurance that a wrong decision would be inconsequential.' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+
+function uid() {
+  return 'p-' + Math.random().toString(36).slice(2,9) + '-' + Date.now().toString(36);
+}
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+const S = {
+  pid:       uid(),
+  startTime: new Date().toISOString(),
+  version:   ['A','B','C'][Math.floor(Math.random() * 3)],
+  condOrder: Math.random() < .5 ? [1, 99] : [99, 1],
+  rcOrder:   shuffle(RC_ITEMS.slice()),   // same randomised order for both RC pages
+  resp:      {},
+  times:     {},
+};
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function mcHTML(name, question, choices) {
+  const q = question ? `<h2>${question}</h2>` : '';
+  const opts = choices.map((c, i) => `
+    <label class="choice-lbl" data-name="${name}">
+      <input type="radio" name="${name}" id="${name}_${i}" value="${c}">
+      <span>${c}</span>
+    </label>`).join('');
+  return `${q}<div class="choices">${opts}</div>`;
+}
+
+function rcPageHTML(condIdx) {
+  const prob    = S.condOrder[condIdx];
+  const suffix  = prob + 'pct';
+  const ordinal = condIdx === 0 ? 'first' : 'second';
+  const cols    = [1,2,3,4,5,6,7];
+
+  const hcells = cols.map(n => `<th>${n}</th>`).join('');
+  const rows   = S.rcOrder.map(it => {
+    const cells = cols.map(n =>
+      `<td><input type="radio" name="rc_${suffix}_${it.key}" value="${n}"></td>`
+    ).join('');
+    return `<tr><td class="rl">${it.text}</td>${cells}</tr>`;
+  }).join('');
+
+  // anchor labels row: "Not at all" above col 1, "A great deal" above col 7
+  const anchorRow = `
+    <tr class="anchor-row">
+      <th class="rh"></th>
+      <th class="anc-left">Not at all</th>
+      <th></th><th></th><th></th><th></th><th></th>
+      <th class="anc-right">A great deal</th>
+    </tr>`;
+
+  return `
+    <p style="margin-bottom:14px;">
+      Now we will ask you about your reasoning for each decision you just made.
+      Please try to recall what you were thinking.
+    </p>
+    <p style="margin-bottom:14px;">
+      In the <strong>${ordinal} scenario</strong>, where there was a
+      <strong>${prob}% chance</strong> that your decision would affect the outcome,
+      how much did each of the following influence your decision?
+    </p>
+    <div class="matrix-outer">
+      <table class="mx">
+        <thead>
+          ${anchorRow}
+          <tr class="num-row">
+            <th class="rh"></th>${hcells}
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function sliderPageHTML(tag) {
+  return `
+    <h2>Given everything you know, how likely are you to take each action?</h2>
+    <p class="note">Your answers must add up to 100%.</p>
+    <div class="sl-item">
+      <div class="sl-label">Publish the findings
+        <span> — if you publish, the findings will definitely become public</span>
+      </div>
+      <div class="sl-row">
+        <input type="range" id="sl_pub_${tag}" min="0" max="100" value="50">
+        <span class="sl-val" id="sv_pub_${tag}">50%</span>
+      </div>
+      <div class="sl-ends"><span>0%</span><span>100%</span></div>
+    </div>
+    <div class="sl-item">
+      <div class="sl-label">Do not publish the findings
+        <span> — the findings will only become public if either of your teammates publish them</span>
+      </div>
+      <div class="sl-row">
+        <input type="range" id="sl_nop_${tag}" min="0" max="100" value="50">
+        <span class="sl-val" id="sv_nop_${tag}">50%</span>
+      </div>
+      <div class="sl-ends"><span>0%</span><span>100%</span></div>
+    </div>`;
+}
+
+function mountSliders(tag) {
+  const sp = document.getElementById('sl_pub_' + tag);
+  const sn = document.getElementById('sl_nop_' + tag);
+  const vp = document.getElementById('sv_pub_' + tag);
+  const vn = document.getElementById('sv_nop_' + tag);
+  function sync(a, b, va, vb) {
+    b.value = 100 - +a.value;
+    va.textContent = a.value + '%';
+    vb.textContent = b.value + '%';
+  }
+  sp.addEventListener('input', () => sync(sp, sn, vp, vn));
+  sn.addEventListener('input', () => sync(sn, sp, vn, vp));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAGE DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
+
+const pages = [];
+
+// ── 0  Consent / intro ────────────────────────────────
+pages.push({
+  render: () => `
+    <h2>Research Study — Consent Form</h2>
+    <p>You have been invited to take part in a research study in which you will answer some
+    questions. This study will be conducted by Joshua Lewis, a faculty member of the Department
+    of Marketing, Stern School of Business, New York University.</p>
+    <p>If you agree to be in this study, you will be asked to do the following: Answer
+    questions. Your participation in this study will take approximately <strong>8 minutes</strong>. There are no
+    known risks associated with your participation in this research beyond those of everyday
+    life. Although you will receive no direct benefits, this research may help improve our
+    understanding of people's judgments and decisions.</p>
+    <p>You will receive <strong>$1.20</strong> for completing this study. If you withdraw before the end of this
+    study or fail to complete the entire study, you will not receive payments through
+    Connect.</p>
+    <p>Confidentiality of your research records will be strictly maintained. To ensure
+    confidentiality, the data collected in this study will be kept in a system that requires a
+    password and any identifiable data will be anonymized. Information not containing
+    identifiers may be used in future research or shared with other researchers without your
+    additional consent.</p>
+    <p>Participation in this study is voluntary. Should you choose to participate in this study,
+    you may refuse to participate or withdraw at any time without penalty. For interviews,
+    questionnaires, or surveys, you have the right to skip or not answer any questions you
+    prefer not to answer. Non-participation or withdrawal will affect your payment.</p>
+    <p>If there is anything about the study or your participation that is unclear or that you do
+    not understand, if you have questions or wish to report a research-related problem, you may
+    contact Joshua Lewis at 215-876-7635, joshua.lewis@nyu.edu, 40 West 4th Street, Tisch 914,
+    New York, NY 10012.</p>
+    <p>For questions about your rights as a research participant, you may contact the University
+    Committee on Activities Involving Human Subjects, New York University, 665 Broadway,
+    Suite 804, New York NY 10012 at (212) 998-4808 or ask.humansubjects@nyu.edu. Please
+    reference the study <strong>#IRB-FY2020-4536</strong> when contacting the
+    IRB (UCAIHS).</p>
+    <p><strong>By clicking "Begin Survey," you confirm that you are at least 18 years old and
+    consent to participate in this research.</strong></p>`,
+  validate: () => null,
+  btnLabel: 'Begin Survey',
+});
+
+// ── 1  Base scenario + comp checks 1 & 2 ─────────────
+pages.push({
+  render: () => `
+    <h2>Please read the following scenario carefully.</h2>
+    <div class="scenario-box">
+      <p>You are on a three-person research team along with two other scientists. Your team
+      recently discovered a new treatment for several infections. If published, this finding
+      would very likely save many lives. However, there is a chance that the same findings
+      could be misused to engineer a dangerous virus, potentially causing a new pandemic.
+      This risk is very small, but real.</p>
+      <p>Each of the three researchers on your team have a brief window of time in which they
+      could publish your discovery to a public scientific database. Doing so simply requires
+      clicking a button to make the finding public instead of clicking a button to keep the
+      finding private — thus, it takes the same amount of effort either way. If <strong>any one of you</strong>
+      publishes the finding, it will become public permanently and cannot be retracted. If <strong>none
+      of you</strong> publish in the brief window of time in which publication is an option, then the
+      research is permanently deleted.</p>
+      <p>Thus, there is an important asymmetry. It only takes one of you to publish the
+      findings, even if the others choose not to. In contrast, the findings only remain private
+      (and the data gets deleted) if all of you decline to publish.</p>
+    </div>
+    <div style="margin-top:28px;"></div>
+    ${mcHTML('comp1', 'Which of the following is correct?', shuffle([
+      'If any one team member publishes the findings, the finding will be public regardless of what the other team members choose to do',
+      'All three team members must agree to publish in order for the finding to be public',
+      'Publishing requires more effort than not publishing',
+      'Team members can discuss their plans before deciding',
+    ]))}
+    <div style="margin-top:24px;"></div>
+    ${mcHTML('comp2', 'Which best describes the findings?', shuffle([
+      'Publishing is highly likely to save lives, but there is a remote possibility of catastrophic misuse',
+      'It is unclear whether publishing would have any benefit at all',
+      'Publishing is certain to cause harm',
+      'The findings have no medical value',
+    ]))}`,
+  minTime: 15,
+  validate() {
+    if (!getChecked('comp1')) return 'Please answer the first question before continuing.';
+    if (!getChecked('comp2')) return 'Please answer the second question before continuing.';
+    return null;
+  },
+  onLeave() {
+    S.resp.comp1 = getChecked('comp1');
+    S.resp.comp2 = getChecked('comp2');
+    ts('scenario');
+  },
+});
+
+// ── helper: push 2 pages per within-subjects condition ─
+function pushCondition(ci) {   // ci = 0 (first shown) or 1 (second shown)
+  const prob    = () => S.condOrder[ci];
+  const ver     = () => S.version;
+  const tag     = () => `${ver()}_${prob()}pct`;
+  const isFirst = ci === 0;
+
+  // ── Manipulation text + comp check 3 ────────────────
+  pages.push({
+    minTime: isFirst ? 10 : 0,
+    render() {
+      const intro = isFirst
+        ? `<p class="note">Please read the following additional information carefully.</p>`
+        : `<p style="font-weight:600;font-size:1rem;margin-bottom:14px;">Please imagine instead that the following is true:</p>`;
+      const choices = shuffle(COMP3[ver()][prob()].slice());
+      return `
+        ${intro}
+        <div class="scenario-box">${MANIP[ver()][prob()]}</div>
+        <div style="margin-top:28px;"></div>
+        ${mcHTML('comp3_' + tag(),
+            'Which of the following best describes the situation?', choices)}`;
+    },
+    validate() {
+      const sel = getChecked('comp3_' + tag());
+      if (!sel) return 'Please select an answer before continuing.';
+      const correct = COMP3[ver()][prob()][0];
+      if (sel !== correct)
+        return 'That answer isn\'t correct — please re-read the scenario above and try again.';
+      return null;
+    },
+    onLeave() {
+      S.resp['comp3_' + tag()] = getChecked('comp3_' + tag());
+      ts('comp3_' + tag());
+    },
+  });
+
+  // ── DV sliders (with reminder) ───────────────────────
+  pages.push({
+    render() {
+      const t = tag();
+      return `
+        <div class="reminder">
+          <strong class="label">Quick reminder</strong>
+          You are one of three researchers who have discovered a risky finding. Any one of you
+          can choose to publish it; if all three of you decline, the research will be deleted.<br><br>
+          ${REMINDERS[ver()][prob()]}
+        </div>
+        ${sliderPageHTML(t)}`;
+    },
+    validate:  () => null,
+    onMount()  { mountSliders(tag()); },
+    onLeave()  {
+      const t = tag();
+      S.resp['dv_' + t + '_publish'] = +document.getElementById('sl_pub_' + t).value;
+      S.resp['dv_' + t + '_nopub']   = +document.getElementById('sl_nop_' + t).value;
+      ts('dv_' + t);
+    },
+  });
+}
+
+pushCondition(0);   // pages 2–3
+pushCondition(1);   // pages 4–5
+
+// ── RC pages (one per condition, in presentation order) ─
+for (let ci = 0; ci < 2; ci++) {
+  const capturedCi = ci;
+  pages.push({
+    render()   { return rcPageHTML(capturedCi); },
+    validate() {
+      const prob = S.condOrder[capturedCi];
+      const suf  = prob + 'pct';
+      for (const it of S.rcOrder) {
+        if (!getChecked(`rc_${suf}_${it.key}`))
+          return 'Please rate all items before continuing.';
+      }
+      return null;
+    },
+    onLeave() {
+      const prob = S.condOrder[capturedCi];
+      const suf  = prob + 'pct';
+      for (const it of S.rcOrder) {
+        S.resp[`rc_${suf}_${it.key}`] = +getChecked(`rc_${suf}_${it.key}`);
+      }
+      if (capturedCi === 1) S.resp.rc_item_order = S.rcOrder.map(i => i.key);
+      ts('rc_' + suf);
+    },
+  });
+}
+
+// ── Closing ───────────────────────────────────────────
+pages.push({
+  render: () => `
+    <h2>A few final questions</h2>
+    <div style="margin-bottom:26px;">
+      <label style="display:block;font-weight:500;margin-bottom:8px;">
+        (Optional) Please briefly explain your reasoning for your responses.
+      </label>
+      <textarea id="reasoning" rows="4"
+        style="width:100%;border:1.5px solid #d0d5dd;border-radius:6px;
+               padding:10px 12px;font-family:inherit;font-size:.95rem;resize:vertical;"></textarea>
+    </div>
+    <div style="margin-bottom:26px;">
+      <label style="display:block;font-weight:500;margin-bottom:8px;" for="age">
+        What is your age?
+      </label>
+      <input id="age" type="number" min="18" max="99" placeholder="e.g. 34"
+        style="width:120px;border:1.5px solid #d0d5dd;border-radius:6px;
+               padding:8px 12px;font-size:.95rem;">
+    </div>
+    <div>
+      <div style="font-weight:500;margin-bottom:10px;">What is your gender?</div>
+      ${mcHTML('gender', null, ['Man','Woman','Other','Prefer not to answer'])}
+    </div>`,
+  validate() {
+    const age = parseInt(document.getElementById('age').value);
+    if (!age || age < 18 || age > 99)
+      return 'Please enter a valid age between 18 and 99.';
+    return getChecked('gender') ? null : 'Please indicate your gender before continuing.';
+  },
+  onLeave() {
+    S.resp.reasoning = document.getElementById('reasoning').value.trim();
+    S.resp.age       = parseInt(document.getElementById('age').value);
+    S.resp.gender    = getChecked('gender');
+    S.resp.endTime   = new Date().toISOString();
+    ts('close');
+    submitData();
+  },
+  btnLabel: 'Submit',
+});
+
+// ── Thank you ─────────────────────────────────────────
+pages.push({
+  render: () => `
+    <div class="ty-wrap">
+      <h1>Thank you for your participation!</h1>
+      <p id="submit-status" style="color:#3b6fc4;font-weight:500;min-height:1.4em;"></p>
+      <p>This study examines how people make decisions when any single person's action can
+      determine the outcome for a group.</p>
+      ${COMPLETION_URL ? `
+      <div style="margin-top:28px;">
+        <a href="${COMPLETION_URL}"
+           style="display:inline-block;background:#3b6fc4;color:#fff;text-decoration:none;
+                  border-radius:7px;padding:13px 36px;font-size:1rem;font-weight:600;">
+          Click here to confirm your participation →
+        </a>
+      </div>` : ''}
+    </div>`,
+  validate: () => null,
+  hideNext: true,
+});
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+
+let cur = 0;
+let _pageStart = 0;
+const TOTAL = pages.length - 1;   // exclude thank-you page from denominator
+
+function getChecked(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : null;
+}
+function ts(label) { S.times[label] = new Date().toISOString(); }
+
+function goTo(idx) {
+  _pageStart = Date.now();
+  S.times['enter_p' + idx] = new Date().toISOString();
+  const page = pages[idx];
+  const pct  = Math.min(Math.round((idx / TOTAL) * 100), 100);
+
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').textContent =
+    idx >= TOTAL ? 'Complete ✓' : `Step ${idx + 1} of ${TOTAL}`;
+
+  const btnHtml = page.hideNext ? '' : `
+    <div class="btn-row">
+      <button class="next-btn" id="nxt">${page.btnLabel || 'Next →'}</button>
+    </div>
+    <p class="err-msg" id="err"></p>`;
+
+  document.getElementById('content').innerHTML =
+    `<div class="card">${page.render()}${btnHtml}</div>`;
+
+  // highlight selected radio choices
+  document.querySelectorAll('.choice-lbl').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+      const name = lbl.dataset.name;
+      document.querySelectorAll(`.choice-lbl[data-name="${name}"]`)
+              .forEach(l => l.classList.remove('selected'));
+      lbl.classList.add('selected');
+    });
+  });
+
+  if (page.onMount) page.onMount();
+
+  const btn = document.getElementById('nxt');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      const errEl = document.getElementById('err');
+      // Minimum reading-time guard
+      const minT = page.minTime || 0;
+      if (minT > 0) {
+        const elapsed = (Date.now() - _pageStart) / 1000;
+        if (elapsed < minT) {
+          const rem = Math.ceil(minT - elapsed);
+          errEl.textContent =
+            `Please take at least ${minT} seconds to read this page before continuing ` +
+            `(${rem} second${rem !== 1 ? 's' : ''} remaining).`;
+          errEl.classList.add('show');
+          return;
+        }
+      }
+      const err  = page.validate ? page.validate() : null;
+      if (err) { errEl.textContent = err; errEl.classList.add('show'); return; }
+      if (page.onLeave) page.onLeave();
+      cur++;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      goTo(cur);
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DATA SUBMISSION
+// ═══════════════════════════════════════════════════════════════
+
+function submitData() {
+  const data = {
+    participant_id:  S.pid,
+    start_time:      S.startTime,
+    version:         S.version,
+    condition_order: S.condOrder.join('_'),
+    ...S.resp,
+    page_times:      S.times,
+  };
+
+  // backup in localStorage
+  try {
+    const store = JSON.parse(localStorage.getItem('unilateralism_u') || '[]');
+    store.push(data);
+    localStorage.setItem('unilateralism_u', JSON.stringify(store));
+  } catch(_) {}
+
+  console.log('UNILATERALISM_U_RESPONSE', JSON.stringify(data, null, 2));
+
+  // ── Google Sheets (Apps Script web app) ───────────
+  // Uses form-encoded POST — avoids URL-length limits and redirect issues with no-cors
+  if (SHEET_URL) {
+    fetch(SHEET_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: new URLSearchParams({ payload: JSON.stringify(data) }),
+    })
+    .then(() => {
+      const el = document.getElementById('submit-status');
+      if (el) el.textContent = '✓ Responses recorded.';
+    })
+    .catch(e => {
+      console.error('Submission error:', e);
+      const el = document.getElementById('submit-status');
+      if (el) el.textContent = 'Note: could not reach server — your responses are saved locally.';
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+goTo(0);
+</script>
+</body>
+</html>
