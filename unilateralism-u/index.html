@@ -164,7 +164,7 @@ table.mx input[type=radio] {
 // ═══════════════════════════════════════════════════════════════
 // GOOGLE SHEETS SUBMISSION — paste your Apps Script web app URL below
 // ═══════════════════════════════════════════════════════════════
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxwgCUQn_gTuU-2WGFwifnM_u2tEaXs_44chBqI28iYceLa62QEaGpV8tVH7Zlu_sKO/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyoa9qX2h2_QVKNJJDpgoYCTpnVfFQslKMmVyt5rgZWjVFrbEcgV0MeMW-GzSki3YTG/exec';
 const COMPLETION_URL = '';  // paste your Prolific / Cloud Research completion link here
 
 // ═══════════════════════════════════════════════════════════════
@@ -803,9 +803,23 @@ function submitData() {
       try { out = raw ? JSON.parse(raw) : null; } catch (_) {}
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (out?.status === 'error') throw new Error(out.message || 'Server returned error status');
-      if (!out && /^\s*Error:/i.test(raw)) throw new Error(raw.trim());
+      if (!out) {
+        const fnMissing = raw.match(/Script function not found:\s*([^<\n]+)/i);
+        if (fnMissing) throw new Error(`Apps Script deployment error: ${fnMissing[0]}`);
+        if (/^\s*Error:/i.test(raw)) throw new Error(raw.trim());
+        throw new Error('Apps Script returned a non-JSON response');
+      }
+
+      if (out.status !== 'ok') {
+        throw new Error(out.message || `Unexpected Apps Script response status: ${String(out.status)}`);
+      }
     };
+
+    const postPayload = () => fetch(SHEET_URL, {
+      method: 'POST',
+      body: new URLSearchParams({ payload: JSON.stringify(data) }),
+      keepalive: true,
+    });
 
     const postJSON = () => fetch(SHEET_URL, {
       method: 'POST',
@@ -813,25 +827,19 @@ function submitData() {
       keepalive: true,
     });
 
-    const postLegacyPayload = () => fetch(SHEET_URL, {
-      method: 'POST',
-      body: new URLSearchParams({ payload: JSON.stringify(data) }),
-      keepalive: true,
-    });
-
-    postJSON()
+    postPayload()
       .then(checkResponse)
       .then(() => {
         if (el) el.textContent = '✓ Responses recorded.';
       })
-      .catch(async (jsonErr) => {
-        console.warn('JSON submission failed, retrying legacy payload format:', jsonErr);
+      .catch(async (payloadErr) => {
+        console.warn('Payload submission failed, retrying raw JSON format:', payloadErr);
         try {
-          const legacyRes = await postLegacyPayload();
-          await checkResponse(legacyRes);
+          const jsonRes = await postJSON();
+          await checkResponse(jsonRes);
           if (el) el.textContent = '✓ Responses recorded.';
-        } catch (legacyErr) {
-          console.error('Submission error:', legacyErr);
+        } catch (jsonErr) {
+          console.error('Submission error:', jsonErr);
           if (el) el.textContent = 'Note: could not reach server — your responses are saved locally.';
         }
       });
