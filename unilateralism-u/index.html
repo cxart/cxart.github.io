@@ -175,7 +175,7 @@ const MANIP = {
   A: {
     1:  `<p>Lastly, there is also some chance that the finding is already public. The web server
 where your research team stores their data and results recently experienced a cybersecurity
-attack in which some research findings were leaked. The hackers automatically uploaded
+attack in which a research finding was leaked. The hackers automatically uploaded
 everything they accessed directly to the same public scientific database that you would publish
 to. The owners of the server determined that there is a <strong>1% chance</strong> that your
 team's research files were included in the data leak. In that case, the research discovery is
@@ -183,14 +183,14 @@ already publicly available, and your decision about whether to publish the findi
 a difference. However, you must make your decision before you find out whether your team's
 research files were included in the leak.</p>
 <p>You cannot communicate with your teammates, and you do not know what they plan to do. If
-none of you decide to publish the results, the findings will soon be deleted to prevent any
-future researchers from accessing them. Thus, you must decide now, before finding out whether
+none of you decide to publish the results, the finding will soon be deleted to prevent any
+future researchers from accessing it. Thus, you must decide now, before finding out whether
 your team's files were included in the data leak, whether to independently publish your team's
-discovery before the findings are permanently destroyed.</p>`,
+discovery before the finding is permanently destroyed.</p>`,
 
     99: `<p>Lastly, there is also some chance that the finding is already public. The web server
 where your research team stores their data and results recently experienced a cybersecurity
-attack in which some research findings were leaked. The hackers automatically uploaded
+attack in which a research finding was leaked. The hackers automatically uploaded
 everything they accessed directly to the same public scientific database that you would publish
 to. The owners of the server determined that there is a <strong>99% chance</strong> that your
 team's research files were included in the data leak. In that case, the research discovery is
@@ -198,10 +198,10 @@ already publicly available, and your decision about whether to publish the findi
 a difference. However, you must make your decision before you find out whether your team's
 research files were included in the leak.</p>
 <p>You cannot communicate with your teammates, and you do not know what they plan to do. If
-none of you decide to publish the results, the findings will soon be deleted to prevent any
-future researchers from accessing them. Thus, you must decide now, before finding out whether
+none of you decide to publish the results, the finding will soon be deleted to prevent any
+future researchers from accessing it. Thus, you must decide now, before finding out whether
 your team's files were included in the data leak, whether to independently publish your team's
-discovery before the findings are permanently destroyed.</p>`,
+discovery before the finding is permanently destroyed.</p>`,
   },
 
   B: {
@@ -212,10 +212,10 @@ survived the fault. If they did not survive — which is very likely — they ar
 and nobody can publish them. If they survived — which is very unlikely — they remain intact
 and any of you can still publish them.</p>
 <p>You cannot communicate with your teammates, and you do not know what they plan to do. If
-none of you decide to publish the results, the findings will soon be deleted to prevent any
-future researchers from accessing them. Thus, you must decide now, before finding out whether
-your files survived, whether to independently publish your team's discovery before the findings
-are permanently destroyed.</p>`,
+none of you decide to publish the results, the finding will soon be deleted to prevent any
+future researchers from accessing it. Thus, you must decide now, before finding out whether
+your files survived, whether to independently publish your team's discovery before the finding
+is permanently destroyed.</p>`,
 
     99: `<p>Lastly, there is also some chance that the finding cannot be made public. Your
 institution's data storage system recently suffered a critical fault. System administrators
@@ -224,10 +224,10 @@ survived the fault. If they survived — which is very likely — they remain in
 you can still publish them. If they did not survive — which is very unlikely — they are gone
 permanently, and nobody can publish them.</p>
 <p>You cannot communicate with your teammates, and you do not know what they plan to do. If
-none of you decide to publish the results, the findings will soon be deleted to prevent any
-future researchers from accessing them. Thus, you must decide now, before finding out whether
-your files survived, whether to independently publish your team's discovery before the findings
-are permanently destroyed.</p>`,
+none of you decide to publish the results, the finding will soon be deleted to prevent any
+future researchers from accessing it. Thus, you must decide now, before finding out whether
+your files survived, whether to independently publish your team's discovery before the finding
+is permanently destroyed.</p>`,
   },
 
   C: {
@@ -236,24 +236,24 @@ Following a system failure, submission buttons have been randomly disabled for s
 System administrators have determined that there is a <strong>1% chance</strong> that your
 submission button is still active. If your button is disabled — which is very likely — pressing
 it will have no effect, and your decision makes no difference. If your button is active — which
-is very unlikely — pressing it will publish the findings immediately and permanently.</p>
+is very unlikely — pressing it will publish the finding immediately and permanently.</p>
 <p>You cannot communicate with your teammates, and you do not know what they plan to do. If
-none of you decide to publish the results, the findings will soon be deleted to prevent any
-future researchers from accessing them. Thus, you must decide now, before knowing whether your
+none of you decide to publish the results, the finding will soon be deleted to prevent any
+future researchers from accessing it. Thus, you must decide now, before knowing whether your
 submission button works or not, whether to try to independently publish your team's discovery
-before the findings are permanently destroyed.</p>`,
+before the finding is permanently destroyed.</p>`,
 
     99: `<p>Lastly, there is also some chance that you cannot make the finding public.
 Following a system failure, submission buttons have been randomly disabled for some researchers.
 System administrators have determined that there is a <strong>99% chance</strong> that your
 submission button is still active. If your button is active — which is very likely — pressing it
-will publish the findings immediately and permanently. If your button is disabled — which is very
+will publish the finding immediately and permanently. If your button is disabled — which is very
 unlikely — pressing it will have no effect, and your decision makes no difference.</p>
 <p>You cannot communicate with your teammates, and you do not know what they plan to do. If
-none of you decide to publish the results, the findings will soon be deleted to prevent any
-future researchers from accessing them. Thus, you must decide now, before knowing whether your
+none of you decide to publish the results, the finding will soon be deleted to prevent any
+future researchers from accessing it. Thus, you must decide now, before knowing whether your
 submission button works or not, whether to try to independently publish your team's discovery
-before the findings are permanently destroyed.</p>`,
+before the finding is permanently destroyed.</p>`,
   },
 };
 
@@ -416,8 +416,8 @@ function sliderPageHTML(tag) {
     <h2>Given everything you know, how likely are you to take each action?</h2>
     <p class="note">Your answers must add up to 100%.</p>
     <div class="sl-item">
-      <div class="sl-label">Publish the findings
-        <span> — if you publish, the findings will definitely become public</span>
+      <div class="sl-label">Publish the finding
+        <span> — if you publish, the finding will definitely become public</span>
       </div>
       <div class="sl-row">
         <input type="range" id="sl_pub_${tag}" min="0" max="100" value="50">
@@ -426,8 +426,8 @@ function sliderPageHTML(tag) {
       <div class="sl-ends"><span>0%</span><span>100%</span></div>
     </div>
     <div class="sl-item">
-      <div class="sl-label">Do not publish the findings
-        <span> — the findings will only become public if either of your teammates publish them</span>
+      <div class="sl-label">Do not publish the finding
+        <span> — the finding will only become public if either of your teammates publish it</span>
       </div>
       <div class="sl-row">
         <input type="range" id="sl_nop_${tag}" min="0" max="100" value="50">
@@ -503,7 +503,7 @@ pages.push({
     <div class="scenario-box">
       <p>You are on a three-person research team along with two other scientists. Your team
       recently discovered a new treatment for several infections. If published, this finding
-      would very likely save many lives. However, there is a chance that the same findings
+      would very likely save many lives. However, there is a chance that the same finding
       could be misused to engineer a dangerous virus, potentially causing a new pandemic.
       This risk is very small, but real.</p>
       <p>Each of the three researchers on your team have a brief window of time in which they
@@ -514,22 +514,22 @@ pages.push({
       of you</strong> publish in the brief window of time in which publication is an option, then the
       research is permanently deleted.</p>
       <p>Thus, there is an important asymmetry. It only takes one of you to publish the
-      findings, even if the others choose not to. In contrast, the findings only remain private
+      finding, even if the others choose not to. In contrast, the finding only remains private
       (and the data gets deleted) if all of you decline to publish.</p>
     </div>
     <div style="margin-top:28px;"></div>
     ${mcHTML('comp1', 'Which of the following is correct?', shuffle([
-      'If any one team member publishes the findings, the finding will be public regardless of what the other team members choose to do',
+      'If any one team member publishes the finding, the finding will be public regardless of what the other team members choose to do',
       'All three team members must agree to publish in order for the finding to be public',
       'Publishing requires more effort than not publishing',
       'Team members can discuss their plans before deciding',
     ]))}
     <div style="margin-top:24px;"></div>
-    ${mcHTML('comp2', 'Which best describes the findings?', shuffle([
+    ${mcHTML('comp2', 'Which best describes the finding?', shuffle([
       'Publishing is highly likely to save lives, but there is a remote possibility of catastrophic misuse',
       'It is unclear whether publishing would have any benefit at all',
       'Publishing is certain to cause harm',
-      'The findings have no medical value',
+      'The finding has no medical value',
     ]))}`,
   minTime: 15,
   validate() {
@@ -679,7 +679,9 @@ pages.push({
   render: () => `
     <div class="ty-wrap">
       <h1>Thank you for your participation!</h1>
-      <p id="submit-status" style="color:#3b6fc4;font-weight:500;min-height:1.4em;"></p>
+      <p id="submit-status" style="color:#3b6fc4;font-weight:500;min-height:1.4em;">
+        ${S.resp.reasoning === 'test123' ? 'Test mode: responses were not saved.' : ''}
+      </p>
       <p>This study examines how people make decisions when any single person's action can
       determine the outcome for a group.</p>
       ${COMPLETION_URL ? `
@@ -780,6 +782,12 @@ function submitData() {
     ...S.resp,
     page_times:      S.times,
   };
+
+  // QA shortcut: entering exactly "test123" in reasoning skips all saving.
+  if (data.reasoning === 'test123') {
+    console.log('TEST MODE: skipping all data saves because reasoning is exactly "test123".');
+    return;
+  }
 
   // backup in localStorage
   try {
