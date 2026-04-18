@@ -10,6 +10,14 @@ from agent import EmailAgent, LinkedInAgent
 
 load_dotenv()
 
+OPENAI_MODEL_OPTIONS = [
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4o-mini",
+]
+
 
 st.set_page_config(page_title="EmailAgent Simple", page_icon="@", layout="wide")
 st.title("EmailAgent Simple")
@@ -27,10 +35,17 @@ with st.sidebar:
         value=os.getenv("SERPER_API_KEY", ""),
         type="password",
     )
-    model_name = st.text_input(
+    default_model = os.getenv("OPENAI_MODEL", "gpt-4.1")
+    model_index = (
+        OPENAI_MODEL_OPTIONS.index(default_model)
+        if default_model in OPENAI_MODEL_OPTIONS
+        else 0
+    )
+    model_name = st.selectbox(
         "OpenAI model",
-        value=os.getenv("OPENAI_MODEL", "gpt-4.1-2025-04-14"),
-        help="Default is gpt-4.1-2025-04-14. You can override this.",
+        options=OPENAI_MODEL_OPTIONS,
+        index=model_index,
+        help="Choose an OpenAI model (essential options from the survey app).",
     )
 
 

@@ -86,7 +86,7 @@
       font-weight: 600;
     }
 
-    input, textarea {
+    input, select, textarea {
       border: 1px solid var(--border);
       border-radius: 10px;
       font-size: 0.95rem;
@@ -226,7 +226,13 @@
 
       <div class="field">
         <label for="model">Model</label>
-        <input id="model" name="model" type="text" value="gpt-4.1">
+        <select id="model" name="model">
+          <option value="gpt-4.1" selected>gpt-4.1</option>
+          <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
+          <option value="gpt-5">gpt-5</option>
+          <option value="gpt-5-mini">gpt-5-mini</option>
+        </select>
       </div>
 
       <div class="field">
@@ -343,7 +349,6 @@
 
     clearBtn.addEventListener("click", () => {
       form.reset();
-      document.getElementById("model").value = "gpt-4.1";
       resetOutput();
     });
 
