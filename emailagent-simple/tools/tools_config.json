@@ -1,0 +1,66 @@
+{
+    "tools": [
+      {
+          "type": "function",
+          "name": "search_web",
+          "description": "Search the web and return a list of relevant URLs.",
+          "parameters": {
+              "type": "object",
+              "properties": {
+              "search_query":      { "type": "string" },
+              "number_of_results": { "type": "number" }
+              },
+              "required": ["search_query", "number_of_results"],
+              "additionalProperties": false
+          },
+          "strict": true
+      },
+      {
+        "type": "function",
+        "name": "load_websites",
+        "description": "Fetch full HTML for a list of URLs.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "urls": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["urls"],
+          "additionalProperties": false
+        },
+        "strict": true
+      },
+      {
+        "type": "function",
+        "name": "return_email",
+        "description": "Return the best email for the person, plus reasoning, backups, and the source URL.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reasoning":        { "type": "string" },
+            "email":            { "type": "string" },
+            "additional_emails":{ "type": "array", "items": { "type": "string" } },
+            "email_source":     { "type": "string" }
+          },
+          "required": ["reasoning", "email", "additional_emails", "email_source"],
+          "additionalProperties": false
+        },
+        "strict": true
+      },
+      {
+        "type": "function",
+        "name": "return_linkedin",
+        "description": "Return the LinkedIn profile URL for a person.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "reasoning":     { "type": "string" },
+            "linkedin_url":  { "type": "string" }
+          },
+          "required": ["reasoning", "linkedin_url"],
+          "additionalProperties": false
+        },
+        "strict": true
+      }
+    ]
+  }
+  

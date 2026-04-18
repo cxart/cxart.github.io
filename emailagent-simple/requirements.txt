@@ -1,0 +1,6 @@
+beautifulsoup4==4.12.3
+openai==1.77.0
+pandas==2.2.3
+python-dotenv==1.1.0
+requests==2.31.0
+streamlit==1.44.1
