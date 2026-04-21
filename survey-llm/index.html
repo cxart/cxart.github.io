@@ -14,27 +14,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="../styles/common.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Georgia&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --bg-color: #ffffff;
-            --text-color: #000000;
-            --secondary-text: #787878;
-            --accent-color: #3245c0;
-            --border-color: #e0e0e0;
             --card-bg: #fafafa;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: 'Open Sans', Arial, sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
 
         /* ── Header ── */
         header {
@@ -45,12 +33,7 @@
 
         header nav { margin-bottom: 0.75rem; }
 
-        header nav a {
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.9rem;
-            border-bottom: 1px dotted currentColor;
-        }
+        header nav a { font-size: 0.9rem; }
 
         header nav a:hover { border-bottom-style: solid; }
 
@@ -723,6 +706,10 @@
             <div id="results-summary"></div>
         </div>
     </main>
+
+    <div class="footer">
+        Carter Allen, 2026
+    </div>
 
     <script>
     // ─────────────────────────────────────────────

@@ -14,6 +14,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="styles/common.css" rel="stylesheet">
 
     <script>
         const images = ["its_me.jpg", "its_me2.jpg", "its_me3.JPG", "its_me5.JPG",
@@ -68,16 +69,7 @@
     </script>
 
     <style>
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #000000;
-            --secondary-text: #787878;
-            --accent-color: #3245c0;
-            --border-color: #e0e0e0;
-        }
-
         body {
-            background-color: var(--bg-color);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -85,14 +77,14 @@
             min-height: 100vh;
             margin: 0;
             padding: 20px;
-            font-family: 'Open Sans', Arial, sans-serif;
-            color: var(--text-color);
-            line-height: 1.6;
         }
 
         #image-container {
             width: 220px;
             height: 220px;
+            position: relative;
+            text-align: center;
+            transition: opacity 0.3s ease;
         }
 
         img {
@@ -141,12 +133,6 @@
             min-width: 320px;
         }
 
-        #image-container {
-            position: relative;
-            text-align: center;
-            transition: opacity 0.3s ease;
-        }
-
         #photo-caption {
             display: none;
             margin-top: 10px;
@@ -161,19 +147,14 @@
             text-align: center;
         }
 
-        nav a {
+        nav a,
+        nav .nav-toggle {
             margin: 0 15px;
             font-size: 1rem;
-            font-weight: 400;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            border-bottom: 1px dotted currentColor;
-            cursor: pointer;
         }
 
-        nav a:hover {
-            border-bottom: 1px solid currentColor;
-            opacity: 0.9;
+        nav .nav-toggle {
+            line-height: 1.2;
         }
 
         #content {
@@ -185,30 +166,6 @@
             font-size: 1rem;
             font-weight: 400;
             box-sizing: border-box;
-        }
-
-        a {
-            font-weight: 400;
-            color: var(--accent-color);
-        }
-
-        #content a {
-            text-decoration: none;
-            transition: all 0.2s ease;
-            border-bottom: 1px dotted currentColor;
-        }
-
-        #content a:hover {
-            border-bottom: 1px solid currentColor;
-            opacity: 0.9;
-        }
-
-        .footer {
-            color: var(--secondary-text);
-            font-size: 0.8rem;
-            text-align: center;
-            margin-top: 40px;
-            padding: 20px 0;
         }
 
         .refresh-text {
@@ -343,7 +300,8 @@
                 padding: 15px;
             }
 
-            nav a {
+            nav a,
+            nav .nav-toggle {
                 margin: 0 10px;
                 font-size: 1rem;
             }
@@ -363,17 +321,17 @@
                 _img.src = window._selectedImage;
                 _img.onload = function() { _img.style.opacity = '1'; };
             </script>
-            <div id="photo-caption">Photo credit: <a href="https://lorenfryxell.com/" target="_blank">Loren Fryxell</a></div>
+            <div id="photo-caption">Photo credit: <a href="https://lorenfryxell.com/" target="_blank" rel="noopener noreferrer">Loren Fryxell</a></div>
         </div>
     </div>
 
     <nav>
         <span id="nav-home">
-            <a href="Allen_CV_April_2026.pdf" target="_blank">CV</a>
-            <a onclick="showTools()">miscellaneous tools</a>
+            <a href="Allen_CV_April_2026.pdf" target="_blank" rel="noopener noreferrer">CV</a>
+            <button type="button" class="link-button nav-toggle" onclick="showTools()">miscellaneous tools</button>
         </span>
         <span id="nav-tools" style="display: none;">
-            <a onclick="showHome()">&larr; back to home</a>
+            <button type="button" class="link-button nav-toggle" onclick="showHome()">&larr; back to home</button>
         </span>
     </nav>
 
@@ -381,30 +339,30 @@
     <div id="home-content">
         <div id="content">
             <p>
-                Hi, I'm Carter! I'm a second-year marketing PhD student at UC Berkeley.
+                Hi, I'm Carter! I'm a second-year PhD student at UC Berkeley.
                 I research judgment and decision-making under uncertainty, with a focus on forecasting and AI.
-                I also work part-time at the <a href="https://forecastingresearch.org/" target="_blank">Forecasting Research Institute</a>.
-                Previously, I did research at <a href="https://eapsychology.org/" target="_blank">NYU</a>, the
-                <a href="https://globalprioritiesinstitute.org/" target="_blank">Global Priorities Institute</a>, and
-                <a href="https://cushmanlab.fas.harvard.edu/" target="_blank">Harvard</a>.
-                I'm supported by a NSF <a href="https://www.nsfgrfp.org/" target="_blank">Graduate Research Fellowship</a>.
+                I also work part-time at the <a href="https://forecastingresearch.org/" target="_blank" rel="noopener noreferrer">Forecasting Research Institute</a>.
+                Previously, I did research at <a href="https://eapsychology.org/" target="_blank" rel="noopener noreferrer">NYU</a>, the
+                <a href="https://globalprioritiesinstitute.org/" target="_blank" rel="noopener noreferrer">Global Priorities Institute</a>, and
+                <a href="https://cushmanlab.fas.harvard.edu/" target="_blank" rel="noopener noreferrer">Harvard</a>.
+                I'm supported by a NSF <a href="https://www.nsfgrfp.org/" target="_blank" rel="noopener noreferrer">Graduate Research Fellowship</a>.
             </p>
 
             <p>
                 I love meeting new people
                 <!-- - reach out to me for a friend-me doc I made! -->
-                and have an autobiographical friend-me doc <a href="https://docs.google.com/document/d/1iS9VJXY_bObddxye1es7dpq8vq_EVkV9eJ1yP6n0m5w/edit?usp=sharing" target="_blank">here</a>.
+                and have an autobiographical friend-me doc <a href="https://docs.google.com/document/d/1iS9VJXY_bObddxye1es7dpq8vq_EVkV9eJ1yP6n0m5w/edit?usp=sharing" target="_blank" rel="noopener noreferrer">here</a>.
                 In my free time I make
-                <a href="https://open.spotify.com/album/0rvNg0DnaLFg3Tv0dTbkPw?si=W_kEUxaGRJ-GuLasgujSlA" target="_blank">bad computer music</a>,
-                read <a href="https://atcarterallen.substack.com/" target="_blank">blog posts</a>, and collect puzzles (send me your favorites)!
+                <a href="https://open.spotify.com/album/0rvNg0DnaLFg3Tv0dTbkPw?si=W_kEUxaGRJ-GuLasgujSlA" target="_blank" rel="noopener noreferrer">bad computer music</a>,
+                read <a href="https://atcarterallen.substack.com/" target="_blank" rel="noopener noreferrer">blog posts</a>, and collect puzzles (send me your favorites)!
             </p>
 
             <p>
-                Follow me on <a href="https://x.com/atcarterallen" target="_blank">twitter</a> and give me <a href="https://www.admonymous.co/atcarterallen" target="_blank">anonymous feedback</a> about how to be better.
+                Follow me on <a href="https://x.com/atcarterallen" target="_blank" rel="noopener noreferrer">twitter</a> and give me <a href="https://www.admonymous.co/atcarterallen" target="_blank" rel="noopener noreferrer">anonymous feedback</a> about how to be better.
             </p>
 
             <div class="footer">
-                Carter Allen, 2025
+                Carter Allen, 2026
                 <div class="refresh-text">Refresh this page for a different picture of me!</div>
             </div>
         </div>
@@ -416,8 +374,7 @@
         <div class="tool-card">
             <h3><a href="survey-llm/index.html">Survey LLMs</a></h3>
             <p>
-                Type a question, select AI models (OpenAI, Anthropic, Gemini), and generate a dataset
-                of free-text responses you can download as CSV.
+                Generate a dataset of responses from LLMs (OpenAI, Anthropic, Gemini) in response to one or more questions.
             </p>
             <span class="tag">LLM</span>
             <span class="tag">Survey</span>
@@ -437,7 +394,7 @@
 
         <!-- ID Mediation Code -->
         <div class="tool-card">
-            <h3><a href="https://github.com/cxart/id_mediation/blob/main/id_mediation.R" target="_blank">Mixed-Design Mediation Code</a></h3>
+            <h3><a href="https://github.com/cxart/id_mediation/blob/main/id_mediation.R" target="_blank" rel="noopener noreferrer">Mixed-Design Mediation Code</a></h3>
             <p>
                 R code for mediation analysis that block-bootstraps/resamples by participant rather than
                 by row. Useful for mixed designs where observations are nested within participants.
@@ -446,7 +403,7 @@
             <span class="tag">Mediation</span>
             <span class="tag">Data Analysis</span>
             <br><br>
-            <a href="https://github.com/cxart/id_mediation/blob/main/id_mediation.R" target="_blank" class="external-link">
+            <a href="https://github.com/cxart/id_mediation/blob/main/id_mediation.R" target="_blank" rel="noopener noreferrer" class="external-link">
                 <i class="fab fa-github"></i> View on GitHub
             </a>
         </div>
@@ -465,7 +422,7 @@
         </div>
 
         <div class="footer">
-            Carter Allen, 2025
+            Carter Allen, 2026
         </div>
     </div>
 

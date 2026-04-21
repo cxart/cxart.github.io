@@ -14,20 +14,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="styles/common.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Georgia&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #000000;
-            --secondary-text: #787878;
-            --accent-color: #3245c0;
-            --border-color: #e0e0e0;
-        }
-
         body {
-            background-color: var(--bg-color);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -35,21 +27,6 @@
             min-height: 100vh;
             margin: 0;
             padding: 20px;
-            font-family: 'Open Sans', Arial, sans-serif;
-            color: var(--text-color);
-            line-height: 1.6;
-        }
-
-        a {
-            color: var(--accent-color);
-            text-decoration: none;
-            border-bottom: 1px dotted currentColor;
-            transition: all 0.2s ease;
-        }
-
-        a:hover {
-            border-bottom: 1px solid currentColor;
-            opacity: 0.9;
         }
 
         #header {
@@ -306,14 +283,6 @@
             font-size: 0.85rem;
         }
 
-        .footer {
-            color: var(--secondary-text);
-            font-size: 0.8rem;
-            text-align: center;
-            margin-top: 40px;
-            padding: 20px 0;
-        }
-
         @media (max-width: 768px) {
             #header h1 {
                 font-size: 2rem;
@@ -473,15 +442,17 @@
         </div>
 
         <div class="github-link">
-            <a href="https://github.com/cxart" target="_blank">
+            <a href="https://github.com/cxart" target="_blank" rel="noopener noreferrer">
                 <i class="fab fa-github"></i> View code on GitHub
             </a>
         </div>
 
         <div class="footer">
-            Carter Allen and Claude Code, 2026
+            Carter Allen, 2026
             <br>
-            Based on power analysis for <a href="https://forecastingresearch.org/" target="_blank">FRI</a> studies
+            Built with Claude Code
+            <br>
+            Based on power analysis for <a href="https://forecastingresearch.org/" target="_blank" rel="noopener noreferrer">FRI</a> studies
         </div>
     </div>
 
