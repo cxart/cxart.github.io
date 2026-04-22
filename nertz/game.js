@@ -803,6 +803,7 @@
       return;
     }
 
+    const previousSelected = cloneJson(state.selected, null);
     state.online.rev = Number(snapshot.rev) || state.online.rev || 0;
     state.online.snapshotReady = true;
     state.running = Boolean(snapshot.running);
@@ -842,7 +843,15 @@
       playerCount: state.players.length,
       players: summarizePlayers(state.players)
     });
-    state.selected = null;
+    let restoredSelection = null;
+    if (previousSelected && state.running) {
+      const localPlayer = getLocalPlayer();
+      const picked = localPlayer ? pickSourceCard(localPlayer, previousSelected, false) : null;
+      if (picked) {
+        restoredSelection = previousSelected;
+      }
+    }
+    state.selected = restoredSelection;
     state.dealAnimating = false;
     state.awaitingReady = false;
     state.readyByPlayerId = {};
@@ -854,7 +863,9 @@
     }
     clearDragging();
     clearPendingPointer();
-    clearSelectionGhost();
+    if (!state.selected) {
+      clearSelectionGhost();
+    }
     if (!state.running && state.winnerId !== null) {
       const winner = state.players.find((player) => player.id === state.winnerId);
       if (winner) {
@@ -3770,11 +3781,14 @@
               })
               .join("")
           : '<div class="ghost-slot"></div>';
+        const dynamicPileOffset = visiblePile.length ? pileTopOffsets[visiblePile.length - 1] : 0;
+        const targetPileOffset = Math.max(HUMAN_PILE_STEP * 3, dynamicPileOffset);
+        const pileStackStyle = `min-height: calc(var(--card-h) + ${targetPileOffset}px);`;
 
         return `
           <div class="tableau-pile" data-target="tableau" data-index="${pileIdx}" data-player-id="${human.id}" data-zone="pile" data-pile="${pileIdx}">
             <div class="pile-label">Pile ${pileIdx + 1}</div>
-            <div class="pile-stack">${cards}</div>
+            <div class="pile-stack" style="${pileStackStyle}">${cards}</div>
           </div>
         `;
       })
