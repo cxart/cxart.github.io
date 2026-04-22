@@ -318,6 +318,15 @@
         forcedSettings,
         playerSpecs: summarizeSpecs(playerSpecs)
       });
+      state.online.enabled = false;
+      state.online.roomData = null;
+      state.online.isHost = false;
+      state.online.syncReady = false;
+      teardownOnlineSync();
+      logOnline("maybeAutoLaunchOnlineMatch local fallback mode enabled", {
+        roomCode: launch.roomCode,
+        onlineEnabled: state.online.enabled
+      });
     }
 
     if (el.playerCount) {

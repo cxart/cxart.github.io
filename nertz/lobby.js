@@ -110,6 +110,7 @@ const state = {
   screen: "home",
   roomCode: null,
   isHost: false,
+  navigatingToGame: false,
   roomData: null,
   unsubRoom: null,   // call to detach room listener
   unsubRooms: null   // call to detach room-list listener
@@ -378,11 +379,24 @@ function countActiveBotSlots(room, seatedPlayers) {
   return count;
 }
 
+async function cancelDisconnectCleanup(code, includeRoomCleanup = false) {
+  if (!db || !code) return;
+  const tasks = [
+    onDisconnect(ref(db, `nertz_rooms/${code}/players/${MY_ID}`)).cancel()
+  ];
+  if (includeRoomCleanup) {
+    tasks.push(onDisconnect(ref(db, `nertz_rooms/${code}`)).cancel());
+  }
+  await Promise.allSettled(tasks);
+  logLobby("cancelDisconnectCleanup", { code, playerId: MY_ID, includeRoomCleanup });
+}
+
 // ── Enter waiting room ────────────────────────────────────────────────────────
 
 function enterRoom(code, isHost) {
   state.roomCode = code;
   state.isHost = isHost;
+  state.navigatingToGame = false;
   logLobby("enterRoom", { code, isHost, playerId: MY_ID });
 
   el.roomCodeValue.textContent = code;
@@ -609,6 +623,7 @@ async function startGame() {
     });
     return;
   }
+  await cancelDisconnectCleanup(state.roomCode, true);
   await update(ref(db, `nertz_rooms/${state.roomCode}`), {
     status: "starting",
     startedAt: Date.now()
@@ -616,7 +631,9 @@ async function startGame() {
   logLobby("startGame set starting", { roomCode: state.roomCode });
 }
 
-function navigateToGame(roomData) {
+async function navigateToGame(roomData) {
+  if (state.navigatingToGame) return;
+  state.navigatingToGame = true;
   if (state.unsubRoom) { state.unsubRoom(); state.unsubRoom = null; }
   const seatedPlayers = normalizeRoomPlayers(roomData || {});
   const activeSeatCount = seatedPlayers.length + countActiveBotSlots(roomData || {}, seatedPlayers);
@@ -633,6 +650,7 @@ function navigateToGame(roomData) {
     playerCount,
     query: Object.fromEntries(params.entries())
   });
+  await cancelDisconnectCleanup(roomData.code || state.roomCode, state.isHost);
   window.location.href = `index.html?${params.toString()}`;
 }
 
