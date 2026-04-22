@@ -19,6 +19,7 @@
   const BOT_NAMES = ["Botney Spears", "Bot Jovi", "Nertz Potter", "Botsy Ross", "Botica Lewinsky", "Barack Obotma", "Dwayne the Bot Johnson", "Elon Nertzk", "Donertz Trump", "Spongebot Squarepants", "Nertz Cobain", "Bothgar"].sort(() => Math.random() - 0.5);
   const LOG_LIMIT = 24;
   const HUMAN_PILE_STEP = 18;
+  const HUMAN_FACE_DOWN_PILE_STEP = 12;
   const BOT_PILE_STEP = 11;
   const MAX_WASTE_VISIBLE = 3;
   const WASTE_SPREAD_STEP = 14;
@@ -910,7 +911,11 @@
       return false;
     }
     if (movePayload.kind === "toCenter") {
-      delete movePayload.centerTarget;
+      const target = movePayload.centerTarget;
+      const keepRequestedNewSlot = typeof target === "string" && target.startsWith("new:");
+      if (!keepRequestedNewSlot) {
+        delete movePayload.centerTarget;
+      }
     }
 
     const payload = {
@@ -1194,10 +1199,18 @@
     runInitialDealAnimation(state.dealToken);
   }
 
+  function tableauDealPattern(playerTotal) {
+    if (Number(playerTotal) === 2) {
+      return [2, 2, 2, 2];
+    }
+    return [1, 2, 3, 4];
+  }
+
   function createPlayers(playerCount, difficulty, playerSpecs = null) {
     const players = [];
     const specs = Array.isArray(playerSpecs) && playerSpecs.length ? playerSpecs.slice(0, 4) : null;
     const count = specs ? specs.length : playerCount;
+    const dealPattern = tableauDealPattern(count);
     const botBacks = generateBotBacks(Math.max(0, count - 1), state.settings.cardBackConfig);
     let nextBotBack = 0;
 
@@ -1209,10 +1222,11 @@
       let cursor = 0;
       const tableau = [];
       for (let pile = 0; pile < 4; pile += 1) {
+        const cardsInPile = dealPattern[pile] || 0;
         const cards = [];
-        for (let j = 0; j < pile + 1; j += 1) {
+        for (let j = 0; j < cardsInPile; j += 1) {
           const card = deck[cursor++];
-          card.faceUp = j === pile;
+          card.faceUp = j === cardsInPile - 1;
           cards.push(card);
         }
         tableau.push(cards);
@@ -1635,17 +1649,26 @@
     }
 
     const schedule = [];
+    const maxPileDepth = state.players.reduce((maxDepth, player) => {
+      const depths = Array.isArray(player?.tableau) ? player.tableau.map((pile) => pile.length) : [];
+      const playerMax = depths.length ? Math.max(...depths) : 0;
+      return Math.max(maxDepth, playerMax);
+    }, 0);
 
-    for (let pass = 0; pass < 4; pass += 1) {
+    for (let pass = 0; pass < maxPileDepth; pass += 1) {
       for (const player of state.players) {
         const backStyle = cardBackStyle(player.cardBack);
-        for (let pile = pass; pile < 4; pile += 1) {
-          const topCard = pass === pile ? player.tableau[pile][pile] : null;
+        for (let pile = 0; pile < 4; pile += 1) {
+          const pileCards = player.tableau[pile] || [];
+          if (pass >= pileCards.length) {
+            continue;
+          }
+          const dealtCard = pass === pileCards.length - 1 ? pileCards[pass] : null;
           schedule.push({
             playerId: player.id,
             zone: "pile",
             pile,
-            card: topCard,
+            card: dealtCard,
             small: !player.isHuman,
             backStyle
           });
@@ -2417,13 +2440,32 @@
     return new Set(state.centerPileSlots.filter((slot) => Number.isFinite(slot)));
   }
 
+  function getResponsiveCenterMaxColumns() {
+    if (window.innerWidth <= 460) return 4;
+    if (window.innerWidth <= 660) return 5;
+    if (window.innerWidth <= 979) return 8;
+    return CENTER_SLOT_COLUMNS;
+  }
+
+  function getCenterColumnCount() {
+    const preferred = state.players.length >= 4 ? 5 : CENTER_SLOT_COLUMNS;
+    return Math.max(1, Math.min(preferred, getResponsiveCenterMaxColumns()));
+  }
+
   function getCenterSlotCount() {
+    const columns = getCenterColumnCount();
+    const baseSlots = state.players.length >= 4 ? columns * 2 : columns;
     const mappedMax = state.centerPileSlots.length ? Math.max(...state.centerPileSlots) : -1;
-    return Math.max(BASE_CENTER_SLOT_COUNT, mappedMax + 1);
+    let count = Math.max(Math.max(BASE_CENTER_SLOT_COUNT, baseSlots), mappedMax + 1);
+    const occupied = getOccupiedCenterSlotSet().size;
+    if (count <= occupied) {
+      count += columns;
+    }
+    return count;
   }
 
   function centerSlotCoords(slot, count) {
-    const columns = Math.min(CENTER_SLOT_COLUMNS, Math.max(1, count));
+    const columns = Math.max(1, Math.min(getCenterColumnCount(), Math.max(1, count)));
     const row = Math.floor(slot / columns);
     const col = slot % columns;
     return { row, col, columns };
@@ -3567,6 +3609,8 @@
 
   function renderCenter() {
     const slotCount = getCenterSlotCount();
+    const columns = getCenterColumnCount();
+    el.centerPiles.style.gridTemplateColumns = `repeat(${columns}, minmax(var(--card-w), 1fr))`;
     const slots = [];
     for (let slot = 0; slot < slotCount; slot += 1) {
       if (state.completedCenterSlots.has(slot)) {
@@ -3699,6 +3743,12 @@
           state.selected && state.selected.type === "tableau" && Number(state.selected.pile) === pileIdx
             ? Number(state.selected.index)
             : -1;
+        const pileTopOffsets = [];
+        let offsetY = 0;
+        for (let i = 0; i < visiblePile.length; i += 1) {
+          pileTopOffsets.push(offsetY);
+          offsetY += visiblePile[i].faceUp ? HUMAN_PILE_STEP : HUMAN_FACE_DOWN_PILE_STEP;
+        }
 
         const cards = visiblePile.length
           ? visiblePile
@@ -3712,7 +3762,7 @@
                   selectedStart >= 0 && isFaceUp && cardIdx >= selectedStart;
 
                 return `
-                  <div class="tableau-card ${isFaceUp ? "source-card" : ""}" style="top:${cardIdx * HUMAN_PILE_STEP}px; z-index:${cardIdx + 1};" ${sourceAttrs}>
+                  <div class="tableau-card ${isFaceUp ? "source-card" : ""}" style="top:${pileTopOffsets[cardIdx]}px; z-index:${cardIdx + 1};" ${sourceAttrs}>
                     ${renderCard(card, { faceUp: isFaceUp, selected })}
                   </div>
                 `;
