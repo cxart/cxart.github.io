@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nertz Online</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='white'/%3E%3Ctext x='18' y='35' font-size='30' font-family='Arial' font-weight='700'%3EA%3C/text%3E%3Ctext x='30' y='82' font-size='56' font-family='Arial'%3E%E2%99%A0%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Sora:wght@300;400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .lobby-shell {
+        max-width: 600px;
+        margin: 0 auto;
+        display: grid;
+        gap: 14px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .lobby-panel {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(7px);
+        padding: 18px 20px;
+      }
+
+      .lobby-panel h2 {
+        margin: 0 0 14px;
+        font-family: "DM Serif Display", Georgia, serif;
+        font-size: 1.1rem;
+        font-weight: 400;
+      }
+
+      /* Screens */
+      .screen { display: none; }
+      .screen.active { display: contents; }
+
+      /* Name row */
+      .name-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .name-row label {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      #player-name {
+        flex: 1;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(6, 11, 15, 0.8);
+        color: var(--text);
+        padding: 8px 10px;
+        font: inherit;
+        font-size: 0.9rem;
+      }
+
+      /* Action buttons row */
+      .action-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      /* Room list */
+      .room-list-empty {
+        color: var(--muted);
+        font-size: 0.84rem;
+        padding: 16px 0;
+        text-align: center;
+      }
+
+      .room-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-bottom: 8px;
+        transition: background 0.12s;
+      }
+
+      .room-item:last-child { margin-bottom: 0; }
+
+      .room-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .room-code-badge {
+        font-family: "DM Serif Display", Georgia, serif;
+        font-size: 1.3rem;
+        color: var(--accent);
+        letter-spacing: 0.06em;
+        min-width: 60px;
+      }
+
+      .room-meta {
+        flex: 1;
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+
+      .room-host {
+        font-size: 0.78rem;
+        color: #c4b08c;
+      }
+
+      /* Join code screen */
+      .code-input-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      #join-code-input {
+        flex: 1;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: rgba(6, 11, 15, 0.8);
+        color: var(--text);
+        padding: 10px 14px;
+        font: inherit;
+        font-size: 1.4rem;
+        font-family: "DM Serif Display", Georgia, serif;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        text-align: center;
+      }
+
+      .error-text {
+        color: var(--danger);
+        font-size: 0.82rem;
+        margin: 0 0 10px;
+      }
+
+      /* Waiting room */
+      .room-code-display {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .room-code-label {
+        font-size: 0.78rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        flex-shrink: 0;
+      }
+
+      .room-code-value {
+        font-family: "DM Serif Display", Georgia, serif;
+        font-size: 2rem;
+        color: var(--accent);
+        letter-spacing: 0.14em;
+        line-height: 1;
+      }
+
+      .copy-hint {
+        font-size: 0.72rem;
+        color: var(--muted);
+        margin-left: auto;
+      }
+
+      /* Player slots */
+      .player-slots {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .player-slot {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .player-slot.empty {
+        border-style: dashed;
+        opacity: 0.45;
+      }
+
+      .slot-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #4a9a6a;
+        flex-shrink: 0;
+      }
+
+      .player-slot.empty .slot-dot {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .slot-name {
+        flex: 1;
+        font-size: 0.9rem;
+      }
+
+      .player-slot.empty .slot-name {
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .slot-badge {
+        font-size: 0.72rem;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--muted);
+      }
+
+      .slot-badge.host {
+        background: rgba(242, 184, 77, 0.15);
+        color: var(--accent);
+      }
+
+      .slot-ready-icon {
+        color: #4a9a6a;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      /* Host settings row */
+      .host-settings {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 16px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .host-settings label {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.82rem;
+        white-space: nowrap;
+      }
+
+      .host-settings select {
+        padding: 5px 8px;
+        font-size: 0.82rem;
+      }
+
+      /* Room actions */
+      .room-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .room-actions .btn-inline {
+        margin-left: auto;
+      }
+
+      /* Config banner (shown when Firebase isn't set up) */
+      .config-banner {
+        background: rgba(210, 87, 87, 0.12);
+        border: 1px solid rgba(210, 87, 87, 0.4);
+        border-radius: 12px;
+        padding: 14px 16px;
+        font-size: 0.84rem;
+        line-height: 1.55;
+        color: #f0b8b8;
+      }
+
+      .config-banner code {
+        font-family: monospace;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.82rem;
+      }
+
+      @media (max-width: 480px) {
+        .action-row { grid-template-columns: 1fr; }
+        .room-code-value { font-size: 1.5rem; }
+      }
+
+      /* 3-column grid so title stays centered and never overlaps the button */
+      .hero {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 0;
+      }
+      .hero .hero-title { grid-column: 2; text-align: center; }
+      .hero .hero-links { grid-column: 3; position: static; transform: none; justify-self: end; white-space: nowrap; margin-left: 24px; }
+
+      @media (max-width: 660px) {
+        .hero { grid-template-columns: 1fr; justify-items: center; }
+        .hero .hero-title,
+        .hero .hero-links { grid-column: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-orb orb-1" aria-hidden="true"></div>
+    <div class="bg-orb orb-2" aria-hidden="true"></div>
+    <div class="bg-grid" aria-hidden="true"></div>
+
+    <main class="lobby-shell">
+      <header class="hero">
+        <div class="hero-title">
+          <h1 style="margin:0">Nertz <span style="color:var(--accent)">Online</span></h1>
+        </div>
+        <div class="hero-links">
+          <a class="home-link" href="index.html">Single Player →</a>
+        </div>
+      </header>
+
+      <!-- ── Firebase not configured banner ── -->
+      <div id="config-banner" class="config-banner hidden">
+        Firebase isn't configured yet. Fill in <code>firebase-config.js</code> with your project credentials to enable multiplayer.
+        See the comments in that file for setup instructions.
+      </div>
+
+      <!-- ══ SCREEN: Home ══ -->
+      <div id="screen-home" class="screen active">
+
+        <section class="lobby-panel">
+          <div class="name-row">
+            <label>
+              Your name
+              <input type="text" id="player-name" maxlength="20" placeholder="Enter your name" autocomplete="off" />
+            </label>
+          </div>
+          <div class="action-row">
+            <button id="create-btn" class="btn-primary">+ Create Room</button>
+            <button id="join-btn" class="btn-secondary">Join by Code →</button>
+          </div>
+        </section>
+
+        <section class="lobby-panel">
+          <h2>Open Rooms</h2>
+          <div id="room-list">
+            <p class="room-list-empty">Looking for rooms…</p>
+          </div>
+        </section>
+
+      </div><!-- /screen-home -->
+
+      <!-- ══ SCREEN: Join by code ══ -->
+      <div id="screen-join" class="screen">
+
+        <section class="lobby-panel">
+          <h2>Join a Room</h2>
+          <div class="code-input-row">
+            <input type="text" id="join-code-input" maxlength="4" placeholder="XKCD" autocomplete="off" spellcheck="false" />
+            <button id="join-code-btn" class="btn-primary">Join</button>
+          </div>
+          <p id="join-error" class="error-text hidden"></p>
+          <button id="join-cancel-btn" class="btn-inline">← Back</button>
+        </section>
+
+      </div><!-- /screen-join -->
+
+      <!-- ══ SCREEN: Waiting Room ══ -->
+      <div id="screen-room" class="screen">
+
+        <section class="lobby-panel">
+          <div class="room-code-display">
+            <span class="room-code-label">Room</span>
+            <span id="room-code-value" class="room-code-value">----</span>
+            <button id="copy-code-btn" class="btn-inline">Copy code</button>
+            <span id="copy-hint" class="copy-hint hidden">Copied!</span>
+          </div>
+
+          <div class="player-slots" id="player-slots"></div>
+
+          <div id="host-settings" class="host-settings hidden">
+            <label>
+              Max players
+              <select id="max-players-select">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4" selected>4</option>
+              </select>
+            </label>
+            <label>
+              Bot difficulty
+              <select id="bot-difficulty-select">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="room-actions">
+            <button id="ready-btn" class="btn-secondary">I'm Ready</button>
+            <button id="start-game-btn" class="btn-primary hidden">Start Game ▶</button>
+            <button id="leave-room-btn" class="btn-inline">Leave</button>
+          </div>
+        </section>
+
+      </div><!-- /screen-room -->
+
+    </main>
+
+    <script type="module" src="lobby.js"></script>
+  </body>
+</html>
