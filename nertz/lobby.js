@@ -641,6 +641,7 @@ async function navigateToGame(roomData) {
   const params = new URLSearchParams({
     room: roomData.code,
     pid: MY_ID,
+    host: state.isHost ? "1" : "0",
     difficulty: roomData.difficulty || "medium",
     playerCount: String(playerCount)
   });

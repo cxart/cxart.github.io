@@ -16,7 +16,7 @@
     12: "Q",
     13: "K"
   };
-  const BOT_NAMES = ["Botney Spears", "Bot Jovi", "Nertz Potter", "Botsy Ross", "Botica Lewinsky", "Barack Obotma", "Dwayne the Bot Johnson", "Elon Nertzk", "Donertz Trump", "Spongebot Squarepants"].sort(() => Math.random() - 0.5);
+  const BOT_NAMES = ["Botney Spears", "Bot Jovi", "Nertz Potter", "Botsy Ross", "Botica Lewinsky", "Barack Obotma", "Dwayne the Bot Johnson", "Elon Nertzk", "Donertz Trump", "Spongebot Squarepants", "Nertz Cobain", "Bothgar"].sort(() => Math.random() - 0.5);
   const LOG_LIMIT = 24;
   const HUMAN_PILE_STEP = 18;
   const BOT_PILE_STEP = 11;
@@ -58,6 +58,7 @@
       enabled: false,
       roomCode: "",
       playerId: "",
+      hostHint: false,
       roomData: null,
       syncReady: false,
       db: null,
@@ -93,7 +94,9 @@
     dealAnimating: false,
     dealToken: 0,
     awaitingReady: false,
-    readyByPlayerId: {}
+    readyByPlayerId: {},
+    rotateConsents: {},
+    rotateProposed: false
   };
 
   const el = {
@@ -203,7 +206,7 @@
 
     if (el.forceReshuffleBtn) {
       el.forceReshuffleBtn.addEventListener("click", () => {
-        executeRotate();
+        onRotateButtonPressed();
       });
     }
 
@@ -268,7 +271,8 @@
 
     const playerCount = clamp(Number(params.get("playerCount")) || state.settings.playerCount, 2, 4);
     const difficulty = normalizeDifficulty(params.get("difficulty") || state.settings.difficulty);
-    const launch = { roomCode, playerId, playerCount, difficulty };
+    const hostHint = params.get("host") === "1";
+    const launch = { roomCode, playerId, playerCount, difficulty, hostHint };
     logOnline("parseOnlineLaunchParams", launch);
     return launch;
   }
@@ -283,6 +287,7 @@
     state.online.enabled = true;
     state.online.roomCode = launch.roomCode;
     state.online.playerId = launch.playerId;
+    state.online.hostHint = Boolean(launch.hostHint);
     state.online.syncReady = false;
 
     let forcedSettings = {
@@ -298,7 +303,8 @@
     const roomData = await tryLoadOnlineRoomData(launch.roomCode);
     if (roomData) {
       state.online.roomData = roomData;
-      state.online.isHost = String(roomData?.hostId || "") === launch.playerId;
+      const hostFromRoom = String(roomData?.hostId || "") === launch.playerId;
+      state.online.isHost = Boolean(launch.hostHint || hostFromRoom);
       const onlineConfig = buildOnlinePlayerSpecsFromRoom(roomData, launch);
       forcedSettings = {
         playerCount: onlineConfig.playerCount,
@@ -309,6 +315,9 @@
       logOnline("maybeAutoLaunchOnlineMatch room data loaded", {
         roomCode: launch.roomCode,
         isHost: state.online.isHost,
+        hostHint: launch.hostHint,
+        hostId: roomData?.hostId || null,
+        hostMatch: hostFromRoom,
         forcedSettings,
         playerSpecs: summarizeSpecs(playerSpecs)
       });
@@ -321,6 +330,7 @@
       state.online.enabled = false;
       state.online.roomData = null;
       state.online.isHost = false;
+      state.online.hostHint = false;
       state.online.syncReady = false;
       teardownOnlineSync();
       logOnline("maybeAutoLaunchOnlineMatch local fallback mode enabled", {
@@ -334,6 +344,23 @@
     }
     if (el.difficulty) {
       el.difficulty.value = forcedSettings.difficulty;
+    }
+
+    if (state.online.syncReady && !state.online.isHost) {
+      logOnline("maybeAutoLaunchOnlineMatch setupRealtimeSync", {
+        roomCode: launch.roomCode,
+        isHost: state.online.isHost
+      });
+      setupOnlineRealtimeSync();
+      el.tableView.classList.remove("hidden");
+      if (el.setupCard) el.setupCard.classList.add("hidden");
+      if (el.hero) el.hero.classList.add("hidden");
+      render();
+      logOnline("maybeAutoLaunchOnlineMatch waiting for host snapshot", {
+        roomCode: launch.roomCode,
+        playerId: launch.playerId
+      });
+      return;
     }
 
     if (!state.running) {
@@ -357,6 +384,87 @@
         roomCode: launch.roomCode
       });
     }
+  }
+
+  function getOnlineHumanPlayers() {
+    return state.players.filter((player) => Boolean(player?.networkId));
+  }
+
+  function isOnlineMultiHumanMatch() {
+    return state.online.enabled && getOnlineHumanPlayers().length > 1;
+  }
+
+  function localRotateConsentActorId() {
+    if (state.online.playerId) {
+      return String(state.online.playerId);
+    }
+    const local = getLocalPlayer();
+    if (local?.networkId) {
+      return String(local.networkId);
+    }
+    return "";
+  }
+
+  function clearRotateConsents() {
+    state.rotateConsents = {};
+  }
+
+  function setRotateConsent(actorId, agree) {
+    if (!actorId) return;
+    if (!state.rotateConsents || typeof state.rotateConsents !== "object") {
+      state.rotateConsents = {};
+    }
+    if (agree) {
+      state.rotateConsents[String(actorId)] = true;
+    } else {
+      delete state.rotateConsents[String(actorId)];
+    }
+  }
+
+  function allHumansConsentedToRotate() {
+    const humans = getOnlineHumanPlayers();
+    if (humans.length < 2) {
+      return false;
+    }
+    return humans.every((player) => Boolean(state.rotateConsents[String(player.networkId)]));
+  }
+
+  function rotateConsentSummary() {
+    return getOnlineHumanPlayers()
+      .map((player) => `${state.rotateConsents[String(player.networkId)] ? "✓" : "○"} ${player.name}`)
+      .join(" · ");
+  }
+
+  function onRotateButtonPressed() {
+    const active = state.running && !state.dealAnimating && !state.awaitingReady;
+    if (!active) return;
+
+    if (isOnlineMultiHumanMatch()) {
+      const actorId = localRotateConsentActorId();
+      if (!actorId) return;
+      const nextAgree = !Boolean(state.rotateConsents[String(actorId)]);
+      if (state.online.isHost) {
+        setRotateConsent(actorId, nextAgree);
+        const me = getLocalPlayer();
+        addLog(`<strong>${me?.name || "You"}</strong> ${nextAgree ? "agreed" : "withdrew"} draw-pile rotation.`);
+        if (allHumansConsentedToRotate()) {
+          executeRotate();
+        } else {
+          publishOnlineSnapshot();
+          render();
+        }
+      } else {
+        submitOnlineIntent({ kind: "rotateConsent", agree: nextAgree });
+        announce(
+          nextAgree ? "Rotate vote sent" : "Rotate vote removed",
+          nextAgree ? "Waiting for all players to agree." : "You withdrew your rotation vote.",
+          1600
+        );
+      }
+      return;
+    }
+
+    executeRotate();
   }
 
   async function ensureOnlineFirebase() {
@@ -617,15 +725,17 @@
     return state.players.find((player) => player.isHuman) || state.players[0] || null;
   }
 
-  function normalizeOnlinePlayerFlags(player) {
+  function normalizeOnlinePlayerFlags(player, fallbackCardBack = null) {
     const networkId = player?.networkId ? String(player.networkId) : null;
     const isLocal = Boolean(state.online.enabled && networkId && networkId === state.online.playerId);
+    const localFallback = state.settings.cardBackConfig;
+    const nonLocalFallback = sanitizeCardBack(fallbackCardBack, null) || botBackForSeat(Number(player?.id) || 0);
     return {
       ...player,
       networkId,
       isHuman: isLocal,
       isNetworkPlayer: Boolean(networkId && !isLocal),
-      cardBack: sanitizeCardBack(player?.cardBack, state.settings.cardBackConfig)
+      cardBack: sanitizeCardBack(player?.cardBack, isLocal ? localFallback : nonLocalFallback)
     };
   }
 
@@ -649,7 +759,8 @@
       logs: cloneJson(state.logs, []),
       lastActivityAt: state.lastActivityAt || Date.now(),
       lastNertzPlayAt: state.lastNertzPlayAt || Date.now(),
-      rotateProposed: Boolean(state.rotateProposed)
+      rotateProposed: Boolean(state.rotateProposed),
+      rotateConsents: cloneJson(state.rotateConsents, {})
     };
   }
 
@@ -663,7 +774,23 @@
     state.online.snapshotReady = true;
     state.running = Boolean(snapshot.running);
     state.winnerId = snapshot.winnerId ?? null;
-    state.players = (snapshot.players || []).map((player) => normalizeOnlinePlayerFlags(player));
+    const previousByKey = new Map();
+    for (const existing of state.players || []) {
+      const networkKey = existing?.networkId ? `network:${String(existing.networkId)}` : null;
+      if (networkKey && !previousByKey.has(networkKey)) {
+        previousByKey.set(networkKey, existing);
+      }
+      const idKey = Number.isInteger(existing?.id) ? `id:${existing.id}` : null;
+      if (idKey && !previousByKey.has(idKey)) {
+        previousByKey.set(idKey, existing);
+      }
+    }
+    state.players = (snapshot.players || []).map((player) => {
+      const networkKey = player?.networkId ? `network:${String(player.networkId)}` : null;
+      const idKey = Number.isInteger(player?.id) ? `id:${player.id}` : null;
+      const previous = (networkKey && previousByKey.get(networkKey)) || (idKey && previousByKey.get(idKey)) || null;
+      return normalizeOnlinePlayerFlags(player, previous?.cardBack || null);
+    });
     state.centerPiles = cloneJson(snapshot.centerPiles, []);
     state.centerPileSlots = cloneJson(snapshot.centerPileSlots, []);
     state.completedCenterSlots = new Set(Array.isArray(snapshot.completedCenterSlots) ? snapshot.completedCenterSlots : []);
@@ -671,6 +798,9 @@
     state.lastActivityAt = Number(snapshot.lastActivityAt) || Date.now();
     state.lastNertzPlayAt = Number(snapshot.lastNertzPlayAt) || state.lastActivityAt;
     state.rotateProposed = Boolean(snapshot.rotateProposed);
+    state.rotateConsents = snapshot.rotateConsents && typeof snapshot.rotateConsents === "object"
+      ? { ...snapshot.rotateConsents }
+      : {};
     logOnline("hydrateFromOnlineSnapshot applied", {
       rev: state.online.rev,
       updatedBy: snapshot.updatedBy || null,
@@ -683,6 +813,12 @@
     state.dealAnimating = false;
     state.awaitingReady = false;
     state.readyByPlayerId = {};
+    el.tableView.classList.remove("hidden");
+    if (el.setupCard) el.setupCard.classList.add("hidden");
+    if (el.hero) el.hero.classList.add("hidden");
+    if (!state.tickHandle) {
+      state.tickHandle = setInterval(gameTick, 90);
+    }
     clearDragging();
     clearPendingPointer();
     clearSelectionGhost();
@@ -756,12 +892,14 @@
 
     const payload = {
       actorId: String(localPlayer.networkId),
+      actorSeat: Number(localPlayer.id),
       move: movePayload,
       createdAt: Date.now()
     };
     logOnline("submitOnlineIntent", {
       roomCode: state.online.roomCode,
       actorId: payload.actorId,
+      actorSeat: payload.actorSeat,
       moveKind: payload.move?.kind || null,
       moveSource: payload.move?.source || null
     });
@@ -769,6 +907,7 @@
       logOnline("submitOnlineIntent failed push", {
         roomCode: state.online.roomCode,
         actorId: payload.actorId,
+        actorSeat: payload.actorSeat,
         moveKind: payload.move?.kind || null
       });
       announce("Move failed", "Unable to send move to host.", 1500);
@@ -787,11 +926,14 @@
     }
 
     const actorId = String(intent.actorId || "");
+    const actorSeat = Number(intent.actorSeat);
     const move = intent.move || null;
-    const actor = state.players.find((player) => String(player.networkId || "") === actorId);
+    const actor = state.players.find((player) => String(player.networkId || "") === actorId) ||
+      (Number.isInteger(actorSeat) ? state.players.find((player) => Number(player.id) === actorSeat) : null);
     logOnline("processOnlineIntent received", {
       intentKey,
       actorId,
+      actorSeat: Number.isInteger(actorSeat) ? actorSeat : null,
       actorName: actor?.name || null,
       moveKind: move?.kind || null,
       moveSource: move?.source || null,
@@ -799,17 +941,45 @@
       dealAnimating: state.dealAnimating,
       awaitingReady: state.awaitingReady
     });
+    if (move?.kind === "rotateConsent") {
+      const consentId = actor?.networkId ? String(actor.networkId) : actorId;
+      const agree = Boolean(move?.agree);
+      setRotateConsent(consentId, agree);
+      addLog(`<strong>${actor?.name || "Player"}</strong> ${agree ? "agreed" : "withdrew"} draw-pile rotation.`);
+      if (allHumansConsentedToRotate()) {
+        executeRotate();
+      } else {
+        publishOnlineSnapshot();
+        render();
+      }
+      const intentRef = state.online.firebaseDb.ref(
+        state.online.db,
+        `nertz_rooms/${state.online.roomCode}/intents/${intentKey}`
+      );
+      state.online.firebaseDb.remove(intentRef).catch(() => {});
+      return;
+    }
     let moved = false;
     if (actor && move && !state.dealAnimating && !state.awaitingReady && state.running) {
       moved = applyMove(actor, move, false);
       if (moved) {
-        logOnline("processOnlineIntent applied", { intentKey, actorId, moveKind: move?.kind || null });
+        logOnline("processOnlineIntent applied", {
+          intentKey,
+          actorId,
+          actorSeat: Number.isInteger(actorSeat) ? actorSeat : null,
+          moveKind: move?.kind || null
+        });
         publishOnlineSnapshot();
       }
     }
 
     if (!moved && intent?.move?.kind) {
-      logOnline("processOnlineIntent invalid", { intentKey, actorId, moveKind: intent?.move?.kind || null });
+      logOnline("processOnlineIntent invalid", {
+        intentKey,
+        actorId,
+        actorSeat: Number.isInteger(actorSeat) ? actorSeat : null,
+        moveKind: intent?.move?.kind || null
+      });
       addLog(`<strong>${actor?.name || "Player"}</strong> attempted an invalid move.`);
     }
 
@@ -961,6 +1131,7 @@
     state.lastNertzPlayAt = Date.now();
     state.lastActivityAt = Date.now();
     state.rotateProposed = false;
+    state.rotateConsents = {};
     state.dealAnimating = true;
     state.dealToken += 1;
     state.awaitingReady = false;
@@ -1112,7 +1283,13 @@
 
     // 3. Check the currently visible waste top (always directly playable right now)
     const wasteTop = getWasteTop(player);
-    if (wasteTop && findCenterTarget(wasteTop.card) !== null) return true;
+    if (wasteTop) {
+      if (findCenterTarget(wasteTop.card) !== null) return true;
+      for (const pile of player.tableau) {
+        const destTop = pile[pile.length - 1];
+        if (destTop && canStackOnTableau(wasteTop.card, destTop)) return true;
+      }
+    }
 
     // Also simulate the full draw cycle: only the top card of each 3-card chunk is playable
     {
@@ -1121,11 +1298,21 @@
       const ordered = [];
       for (let i = cursor; i < slots.length; i++) { if (slots[i]) ordered.push(slots[i]); }
       for (let i = 0; i < cursor; i++) { if (slots[i]) ordered.push(slots[i]); }
+
+      const canPlay = (card) => {
+        if (findCenterTarget(card) !== null) return true;
+        for (const pile of player.tableau) {
+          const destTop = pile[pile.length - 1];
+          if (destTop && canStackOnTableau(card, destTop)) return true;
+        }
+        return false;
+      };
+
       for (let i = 2; i < ordered.length; i += 3) {
-        if (findCenterTarget(ordered[i]) !== null) return true;
+        if (canPlay(ordered[i])) return true;
       }
       const remainder = ordered.length % 3;
-      if (remainder > 0 && findCenterTarget(ordered[ordered.length - 1]) !== null) return true;
+      if (remainder > 0 && canPlay(ordered[ordered.length - 1])) return true;
     }
 
     return false;
@@ -1149,6 +1336,7 @@
 
   function checkStuck() {
     if (!state.running || state.dealAnimating || state.awaitingReady) return;
+    if (isOnlineMultiHumanMatch()) return;
     if (state.rotateProposed) return; // already waiting for agreement
     const now = Date.now();
     if (now - state.lastStuckCheck < 3000) return;
@@ -1166,7 +1354,11 @@
     if (state.online.enabled && !state.online.isHost) {
       return;
     }
+    if (isOnlineMultiHumanMatch() && !allHumansConsentedToRotate()) {
+      return;
+    }
     state.rotateProposed = false;
+    clearRotateConsents();
     state.lastReshuffle = Date.now();
     state.lastActivityAt = Date.now();
     state.lastNertzPlayAt = Date.now();
@@ -1815,21 +2007,30 @@
       return false;
     }
 
+    let moved = false;
     switch (move.kind) {
       case "draw": {
         const drew = drawFromHand(player);
         if (drew && isBot) {
           addLog(`<strong>${player.name}</strong> cycled 3 cards.`);
         }
-        return drew;
+        moved = drew;
+        break;
       }
       case "toCenter":
-        return moveToCenter(player, move.source, move.centerTarget, isBot);
+        moved = moveToCenter(player, move.source, move.centerTarget, isBot);
+        break;
       case "toTableau":
-        return moveToTableau(player, move.source, move.toPile, isBot);
+        moved = moveToTableau(player, move.source, move.toPile, isBot);
+        break;
       default:
-        return false;
+        moved = false;
     }
+
+    if (moved && isOnlineMultiHumanMatch()) {
+      clearRotateConsents();
+    }
+    return moved;
   }
 
   function moveToCenter(player, source, centerTarget, isBot) {
@@ -2014,7 +2215,13 @@
 
     if (src.type === "tableau") {
       const pile = player.tableau[src.pile];
-      pile.splice(src.index ?? pile.length - 1);
+      const removeCount = Math.max(1, Number(picked?.run?.length) || 1);
+      const fallbackIndex = Math.max(0, pile.length - removeCount);
+      const startIndex = Number.isInteger(src.index) ? src.index : fallbackIndex;
+      if (startIndex < 0 || startIndex >= pile.length) {
+        return;
+      }
+      pile.splice(startIndex, removeCount);
       if (pile.length > 0 && !pile[pile.length - 1].faceUp) {
         pile[pile.length - 1].faceUp = true;
       }
@@ -2437,6 +2644,7 @@
     state.dealAnimating = false;
     state.awaitingReady = false;
     state.readyByPlayerId = {};
+    state.rotateConsents = {};
     state.dealToken += 1;
     state.winnerId = winner.id;
     state.selected = null;
@@ -3141,11 +3349,24 @@
     renderLog();
     syncSelectionGhost();
     if (el.forceReshuffleBtn) {
-      if (state.online.enabled && !state.online.isHost) {
+      const active = state.running && !state.dealAnimating && !state.awaitingReady;
+      const isConsensusMode = isOnlineMultiHumanMatch();
+
+      if (!isConsensusMode && state.online.enabled && !state.online.isHost) {
         el.forceReshuffleBtn.style.display = "none";
         return;
       }
-      const active = state.running && !state.dealAnimating && !state.awaitingReady;
+
+      if (isConsensusMode) {
+        el.forceReshuffleBtn.style.display = active ? "block" : "none";
+        if (active) {
+          const summary = rotateConsentSummary();
+          el.forceReshuffleBtn.textContent = summary
+            ? `Rotate Draw Piles (${summary})`
+            : "Rotate Draw Piles";
+        }
+        return;
+      }
 
       // If rotation was proposed but a valid move appeared, cancel the proposal
       if (state.rotateProposed && active && state.players.some(hasAnyProgressMove)) {
@@ -3226,6 +3447,7 @@
     el.botRow.style.gridTemplateColumns = stackBots || bots.length <= 1
       ? "1fr"
       : `repeat(${bots.length}, minmax(0, 1fr))`;
+    el.botRow.dataset.botCount = String(state.players.length);
 
     el.botRow.innerHTML = bots
       .map((bot) => {
