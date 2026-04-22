@@ -170,6 +170,8 @@
     document.body.setAttribute("data-back-style", back.pattern);
     document.documentElement.style.setProperty("--back-color-1", back.color1);
     document.documentElement.style.setProperty("--back-color-2", back.color2);
+    document.body.style.setProperty("--back-bg", `linear-gradient(140deg, ${back.color1} 45%, ${back.color2})`);
+    document.body.style.setProperty("--back-pattern", patternToCss(back.pattern, back.color2));
     state.settings.cardBack = back.pattern;
     state.settings.cardBackConfig = back;
     renderBackPreviewMini(back);
@@ -179,6 +181,9 @@
     if (!el.backPreviewMini) return;
     el.backPreviewMini.style.setProperty("--back-color-1", back.color1);
     el.backPreviewMini.style.setProperty("--back-color-2", back.color2);
+    el.backPreviewMini.style.setProperty("--back-bg", `linear-gradient(140deg, ${back.color1} 45%, ${back.color2})`);
+    el.backPreviewMini.style.setProperty("--back-pattern", patternToCss(back.pattern, back.color2));
+    el.backPreviewMini.style.setProperty("--back-pattern-size", patternSize(back.pattern));
     el.backPreviewMini.setAttribute("data-pattern", back.pattern);
   }
 
@@ -903,21 +908,29 @@
     return backs;
   }
 
-  function patternToCss(pattern) {
+  function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function patternToCss(pattern, color2) {
+    const c = color2 || "#ffffff";
     switch (pattern) {
       case "dots":
-        return "radial-gradient(circle at center, rgba(255, 255, 255, 0.22) 0 3px, transparent 3px 12px), radial-gradient(circle at top left, rgba(255, 255, 255, 0.12) 0 3px, transparent 4px 10px)";
+        return `radial-gradient(circle at center, ${hexToRgba(c,.75)} 0 3px, transparent 3px 12px), radial-gradient(circle at top left, ${hexToRgba(c,.45)} 0 3px, transparent 4px 10px)`;
       case "grid":
-        return "repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px), repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px)";
+        return `repeating-linear-gradient(90deg, ${hexToRgba(c,.55)} 0 1px, transparent 1px 10px), repeating-linear-gradient(0deg, ${hexToRgba(c,.55)} 0 1px, transparent 1px 10px)`;
       case "stars":
-        return "radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0 2px, transparent 2px 12px), conic-gradient(from 20deg, rgba(255, 255, 255, 0.14), transparent 40%, rgba(255, 255, 255, 0.14))";
+        return `radial-gradient(circle at center, ${hexToRgba(c,.70)} 0 2px, transparent 2px 12px), conic-gradient(from 20deg, ${hexToRgba(c,.45)}, transparent 40%, ${hexToRgba(c,.45)})`;
       case "hex":
-        return "repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 8px), repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 8px)";
+        return `repeating-linear-gradient(60deg, ${hexToRgba(c,.55)} 0 1px, transparent 1px 8px), repeating-linear-gradient(-60deg, ${hexToRgba(c,.50)} 0 1px, transparent 1px 8px)`;
       case "diamond":
-        return "repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px), repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px)";
+        return `repeating-linear-gradient(45deg, ${hexToRgba(c,.60)} 0 1px, transparent 1px 14px), repeating-linear-gradient(-45deg, ${hexToRgba(c,.60)} 0 1px, transparent 1px 14px)`;
       case "weave":
       default:
-        return "repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 8px, rgba(255, 255, 255, 0.03) 8px 16px)";
+        return `repeating-linear-gradient(45deg, ${hexToRgba(c,.70)} 0 8px, ${hexToRgba(c,.12)} 8px 16px)`;
     }
   }
 
@@ -929,8 +942,8 @@
     if (!back) {
       return "";
     }
-    const bg = `linear-gradient(140deg, ${back.color1}, ${back.color2})`;
-    const pattern = patternToCss(back.pattern);
+    const bg = `linear-gradient(140deg, ${back.color1} 45%, ${back.color2})`;
+    const pattern = patternToCss(back.pattern, back.color2);
     const size = patternSize(back.pattern);
     return `--card-back-bg:${bg};--card-back-pattern:${pattern};--card-back-size:${size};`;
   }

@@ -14,7 +14,7 @@
   --shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
   --back-color-1: #7a1621;
   --back-color-2: #b03641;
-  --back-bg: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
+  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
   --back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 8px, rgba(255, 255, 255, 0.03) 8px 16px);
 }
 
@@ -222,6 +222,8 @@ h1 {
   position: absolute;
   inset: 2px;
   border-radius: 4px;
+  background: var(--back-pattern);
+  background-size: var(--back-pattern-size, auto);
 }
 
 .back-preview-mini::after {
@@ -232,53 +234,8 @@ h1 {
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.back-preview-mini[data-pattern="weave"] {
-  background: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
-}
-.back-preview-mini[data-pattern="weave"]::before {
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 8px, rgba(255, 255, 255, 0.03) 8px 16px);
-}
-
-.back-preview-mini[data-pattern="dots"] {
-  background: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
-}
-.back-preview-mini[data-pattern="dots"]::before {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.22) 0 3px, transparent 3px 12px),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12) 0 3px, transparent 4px 10px);
-  background-size: 20px 20px;
-}
-
-.back-preview-mini[data-pattern="grid"] {
-  background: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
-}
-.back-preview-mini[data-pattern="grid"]::before {
-  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px);
-}
-
-.back-preview-mini[data-pattern="stars"] {
-  background: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
-}
-.back-preview-mini[data-pattern="stars"]::before {
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0 2px, transparent 2px 12px),
-    conic-gradient(from 20deg, rgba(255, 255, 255, 0.14), transparent 40%, rgba(255, 255, 255, 0.14));
-  background-size: 20px 20px;
-}
-
-.back-preview-mini[data-pattern="hex"] {
-  background: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
-}
-.back-preview-mini[data-pattern="hex"]::before {
-  background: repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 8px),
-    repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 8px);
-}
-
-.back-preview-mini[data-pattern="diamond"] {
-  background: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
-}
-.back-preview-mini[data-pattern="diamond"]::before {
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px);
+.back-preview-mini[data-pattern] {
+  background: var(--back-bg, linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2)));
 }
 
 .btn-cardback {
@@ -1014,12 +971,12 @@ body.dragging-card .source-card {
 }
 
 body[data-back-style="weave"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
+  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
   --back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 8px, rgba(255, 255, 255, 0.03) 8px 16px);
 }
 
 body[data-back-style="dots"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
+  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
   --back-pattern: radial-gradient(circle at center, rgba(255, 255, 255, 0.22) 0 3px, transparent 3px 12px),
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.12) 0 3px, transparent 4px 10px);
 }
@@ -1029,13 +986,13 @@ body[data-back-style="dots"] .card.face-down::before {
 }
 
 body[data-back-style="grid"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
+  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
   --back-pattern: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px);
 }
 
 body[data-back-style="stars"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
+  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
   --back-pattern: radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0 2px, transparent 2px 12px),
     conic-gradient(from 20deg, rgba(255, 255, 255, 0.14), transparent 40%, rgba(255, 255, 255, 0.14));
 }
@@ -1045,13 +1002,13 @@ body[data-back-style="stars"] .card.face-down::before {
 }
 
 body[data-back-style="hex"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
+  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
   --back-pattern: repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 8px),
     repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 8px);
 }
 
 body[data-back-style="diamond"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1), var(--back-color-2));
+  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
   --back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px),
     repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px);
 }

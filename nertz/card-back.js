@@ -1,46 +1,53 @@
 (() => {
+  function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
   const PATTERNS = [
     {
       id: "weave",
       label: "Weave",
-      pattern: "repeating-linear-gradient(45deg,rgba(255,255,255,.16) 0 8px,rgba(255,255,255,.03) 8px 16px)"
+      pattern: c2 => `repeating-linear-gradient(45deg,${hexToRgba(c2,.70)} 0 8px,${hexToRgba(c2,.12)} 8px 16px)`
     },
     {
       id: "dots",
       label: "Dots",
-      pattern:
-        "radial-gradient(circle at 50% 50%,rgba(255,255,255,.22) 0 3px,transparent 3px 12px)," +
-        "radial-gradient(circle at 0 0,rgba(255,255,255,.12) 0 3px,transparent 4px 10px)",
+      pattern: c2 =>
+        `radial-gradient(circle at 50% 50%,${hexToRgba(c2,.75)} 0 3px,transparent 3px 12px),` +
+        `radial-gradient(circle at 0 0,${hexToRgba(c2,.45)} 0 3px,transparent 4px 10px)`,
       size: "20px 20px"
     },
     {
       id: "grid",
       label: "Grid",
-      pattern:
-        "repeating-linear-gradient(90deg,rgba(255,255,255,.1) 0 1px,transparent 1px 10px)," +
-        "repeating-linear-gradient(0deg,rgba(255,255,255,.1) 0 1px,transparent 1px 10px)"
+      pattern: c2 =>
+        `repeating-linear-gradient(90deg,${hexToRgba(c2,.55)} 0 1px,transparent 1px 10px),` +
+        `repeating-linear-gradient(0deg,${hexToRgba(c2,.55)} 0 1px,transparent 1px 10px)`
     },
     {
       id: "stars",
       label: "Stars",
-      pattern:
-        "radial-gradient(circle at center,rgba(255,255,255,.2) 0 2px,transparent 2px 12px)," +
-        "conic-gradient(from 20deg,rgba(255,255,255,.14),transparent 40%,rgba(255,255,255,.14))",
+      pattern: c2 =>
+        `radial-gradient(circle at center,${hexToRgba(c2,.70)} 0 2px,transparent 2px 12px),` +
+        `conic-gradient(from 20deg,${hexToRgba(c2,.45)},transparent 40%,${hexToRgba(c2,.45)})`,
       size: "20px 20px"
     },
     {
       id: "hex",
       label: "Hex",
-      pattern:
-        "repeating-linear-gradient(60deg,rgba(255,255,255,.12) 0 1px,transparent 1px 8px)," +
-        "repeating-linear-gradient(-60deg,rgba(255,255,255,.1) 0 1px,transparent 1px 8px)"
+      pattern: c2 =>
+        `repeating-linear-gradient(60deg,${hexToRgba(c2,.55)} 0 1px,transparent 1px 8px),` +
+        `repeating-linear-gradient(-60deg,${hexToRgba(c2,.50)} 0 1px,transparent 1px 8px)`
     },
     {
       id: "diamond",
       label: "Diamond",
-      pattern:
-        "repeating-linear-gradient(45deg,rgba(255,255,255,.15) 0 1px,transparent 1px 14px)," +
-        "repeating-linear-gradient(-45deg,rgba(255,255,255,.15) 0 1px,transparent 1px 14px)"
+      pattern: c2 =>
+        `repeating-linear-gradient(45deg,${hexToRgba(c2,.60)} 0 1px,transparent 1px 14px),` +
+        `repeating-linear-gradient(-45deg,${hexToRgba(c2,.60)} 0 1px,transparent 1px 14px)`
     }
   ];
 
@@ -98,7 +105,7 @@
   }
 
   function bgGradient(c1, c2) {
-    return `linear-gradient(140deg,${c1},${c2})`;
+    return `linear-gradient(140deg,${c1} 45%,${c2})`;
   }
 
   /* ── Pattern swatches ── */
@@ -133,7 +140,7 @@
       const pDef = getPatternDef(id);
       const card = wrap.querySelector(".swatch-card");
       card.style.setProperty("--swatch-bg", bg);
-      card.style.setProperty("--swatch-pattern", pDef.pattern);
+      card.style.setProperty("--swatch-pattern", pDef.pattern(state.color2));
       card.style.setProperty("--swatch-size", pDef.size || "auto");
       wrap.classList.toggle("selected", id === state.pattern);
     });
@@ -170,7 +177,7 @@
   function updatePreview() {
     const pDef = getPatternDef(state.pattern);
     el.previewCard.style.setProperty("--preview-bg", bgGradient(state.color1, state.color2));
-    el.previewCard.style.setProperty("--preview-pattern", pDef.pattern);
+    el.previewCard.style.setProperty("--preview-pattern", pDef.pattern(state.color2));
     el.previewCard.style.setProperty("--preview-size", pDef.size || "auto");
   }
 
