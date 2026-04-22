@@ -59,11 +59,19 @@ const MY_ID = getPlayerId();
 // ── Room code generation ──────────────────────────────────────────────────────
 
 const CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
+const MIN_ROOM_PLAYERS = 2;
+const MAX_ROOM_PLAYERS = 4;
 
 function randomCode() {
   return Array.from({ length: 4 }, () =>
     CHARSET[Math.floor(Math.random() * CHARSET.length)]
   ).join("");
+}
+
+function clampRoomSize(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return MAX_ROOM_PLAYERS;
+  return Math.max(MIN_ROOM_PLAYERS, Math.min(MAX_ROOM_PLAYERS, Math.floor(n)));
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -138,17 +146,20 @@ function renderRoomList(rooms) {
     return;
   }
   el.roomList.innerHTML = rooms.map(room => {
-    const players = Object.values(room.players || {});
-    const count = players.length;
-    const max = room.maxPlayers || 4;
-    const hostPlayer = players.find(p => p.id === room.hostId);
+    const seatedPlayers = normalizeRoomPlayers(room);
+    const humanCount = seatedPlayers.length;
+    const botCount = countActiveBotSlots(room, seatedPlayers);
+    const count = humanCount + botCount;
+    const max = clampRoomSize(room.maxPlayers || MAX_ROOM_PLAYERS);
+    const hostPlayer = seatedPlayers.find(p => p.id === room.hostId);
     const hostName = hostPlayer ? hostPlayer.name : "Unknown";
     const full = count >= max;
+    const botLabel = botCount > 0 ? ` (${botCount} bot${botCount > 1 ? "s" : ""})` : "";
     return `
       <div class="room-item">
         <span class="room-code-badge">${room.code}</span>
         <span class="room-meta">
-          ${count}/${max} players
+          ${count}/${max} seats used${botLabel}
           <span class="room-host"> · hosted by ${escapeHtml(hostName)}</span>
         </span>
         <button
@@ -178,16 +189,17 @@ async function createRoom() {
     code = randomCode();
   }
 
-  const maxPlayers = 4;
+  const maxPlayers = MAX_ROOM_PLAYERS;
   const roomData = {
     code,
     hostId: MY_ID,
     status: "waiting",
     maxPlayers,
     difficulty: "medium",
+    botSlots: {},
     createdAt: Date.now(),
     players: {
-      [MY_ID]: { id: MY_ID, name, ready: false, joinedAt: Date.now(), cardBack: getCardBack() }
+      [MY_ID]: { id: MY_ID, seat: 0, name, ready: false, joinedAt: Date.now(), cardBack: getCardBack() }
     }
   };
 
@@ -216,11 +228,12 @@ async function joinRoom(code) {
   const room = snap.val();
   if (room.status !== "waiting") { showJoinError("That game has already started."); return; }
 
-  const players = Object.values(room.players || {});
-  if (players.length >= room.maxPlayers) { showJoinError("Room is full."); return; }
+  const seatedPlayers = normalizeRoomPlayers(room);
+  const seat = firstOpenHumanSeat(room, seatedPlayers);
+  if (seat < 0) { showJoinError("Room is full."); return; }
 
   await update(ref(db, `nertz_rooms/${code}/players/${MY_ID}`), {
-    id: MY_ID, name, ready: false, joinedAt: Date.now(), cardBack: getCardBack()
+    id: MY_ID, seat, name, ready: false, joinedAt: Date.now(), cardBack: getCardBack()
   });
 
   // Auto-remove on disconnect
@@ -232,6 +245,80 @@ async function joinRoom(code) {
 function showJoinError(msg) {
   el.joinError.textContent = msg;
   el.joinError.classList.toggle("hidden", !msg);
+}
+
+function sortPlayersByJoin(players) {
+  return players.slice().sort((a, b) => {
+    const left = Number(a?.joinedAt) || 0;
+    const right = Number(b?.joinedAt) || 0;
+    if (left !== right) return left - right;
+    return String(a?.id || "").localeCompare(String(b?.id || ""));
+  });
+}
+
+function getSanitizedBotSlots(room) {
+  const maxPlayers = clampRoomSize(room?.maxPlayers || MAX_ROOM_PLAYERS);
+  const raw = room?.botSlots || {};
+  const out = {};
+  Object.entries(raw).forEach(([slotKey, enabled]) => {
+    if (!enabled) return;
+    const slot = Number(slotKey);
+    if (!Number.isInteger(slot) || slot < 0 || slot >= maxPlayers) return;
+    out[slot] = true;
+  });
+  return out;
+}
+
+function normalizeRoomPlayers(room) {
+  const maxPlayers = clampRoomSize(room?.maxPlayers || MAX_ROOM_PLAYERS);
+  const sorted = sortPlayersByJoin(Object.values(room?.players || {}));
+  const usedSeats = new Set();
+  const unresolved = [];
+  const withSeats = [];
+
+  for (const player of sorted) {
+    const seat = Number(player?.seat);
+    if (Number.isInteger(seat) && seat >= 0 && seat < maxPlayers && !usedSeats.has(seat)) {
+      withSeats.push({ ...player, seat });
+      usedSeats.add(seat);
+    } else {
+      unresolved.push(player);
+    }
+  }
+
+  for (const player of unresolved) {
+    let seat = 0;
+    while (usedSeats.has(seat) && seat < maxPlayers) seat += 1;
+    if (seat >= maxPlayers) continue;
+    withSeats.push({ ...player, seat });
+    usedSeats.add(seat);
+  }
+
+  return withSeats.sort((a, b) => a.seat - b.seat);
+}
+
+function firstOpenHumanSeat(room, seatedPlayers) {
+  const maxPlayers = clampRoomSize(room?.maxPlayers || MAX_ROOM_PLAYERS);
+  const occupiedSeats = new Set(seatedPlayers.map((player) => player.seat));
+  const botSlots = getSanitizedBotSlots(room);
+  for (let slot = 0; slot < maxPlayers; slot += 1) {
+    if (occupiedSeats.has(slot)) continue;
+    if (botSlots[slot]) continue;
+    return slot;
+  }
+  return -1;
+}
+
+function countActiveBotSlots(room, seatedPlayers) {
+  const maxPlayers = clampRoomSize(room?.maxPlayers || MAX_ROOM_PLAYERS);
+  const occupiedSeats = new Set(seatedPlayers.map((player) => player.seat));
+  const botSlots = getSanitizedBotSlots(room);
+  let count = 0;
+  for (let slot = 0; slot < maxPlayers; slot += 1) {
+    if (occupiedSeats.has(slot)) continue;
+    if (botSlots[slot]) count += 1;
+  }
+  return count;
 }
 
 // ── Enter waiting room ────────────────────────────────────────────────────────
@@ -277,10 +364,14 @@ function watchRoom(code) {
 // ── Render waiting room ───────────────────────────────────────────────────────
 
 function renderWaitingRoom(data) {
-  const players = Object.values(data.players || {});
-  const maxPlayers = data.maxPlayers || 4;
-  const me = data.players?.[MY_ID];
-  const allReady = players.length > 1 && players.every(p => p.ready);
+  const seatedPlayers = normalizeRoomPlayers(data);
+  const playersBySeat = new Map(seatedPlayers.map((player) => [player.seat, player]));
+  const maxPlayers = clampRoomSize(data.maxPlayers || MAX_ROOM_PLAYERS);
+  const botSlots = getSanitizedBotSlots(data);
+  const me = seatedPlayers.find((player) => player.id === MY_ID);
+  const allHumansReady = seatedPlayers.length > 0 && seatedPlayers.every((player) => Boolean(player.ready));
+  const activeBotCount = countActiveBotSlots(data, seatedPlayers);
+  const activeSeatCount = seatedPlayers.length + activeBotCount;
 
   // Sync host settings dropdowns to room data
   if (state.isHost) {
@@ -288,10 +379,10 @@ function renderWaitingRoom(data) {
     el.botDifficultySelect.value = data.difficulty || "medium";
   }
 
-  // Player slots (filled + empty)
+  // Player slots (filled + bot + empty)
   const slots = [];
   for (let i = 0; i < maxPlayers; i++) {
-    const p = players[i];
+    const p = playersBySeat.get(i);
     if (p) {
       slots.push(`
         <div class="player-slot">
@@ -300,13 +391,29 @@ function renderWaitingRoom(data) {
           ${p.id === data.hostId ? `<span class="slot-badge host">Host</span>` : ""}
           ${p.ready ? `<span class="slot-ready-icon">✓</span>` : `<span class="slot-badge">Not ready</span>`}
         </div>`);
-    } else {
-      slots.push(`
-        <div class="player-slot empty">
-          <span class="slot-dot"></span>
-          <span class="slot-name">Waiting for player…</span>
-        </div>`);
+      continue;
     }
+
+    if (botSlots[i]) {
+      slots.push(`
+        <div class="player-slot bot-slot">
+          <span class="slot-dot"></span>
+          <span class="slot-name">Bot Seat</span>
+          <span class="slot-badge">Bot</span>
+          ${state.isHost ? `<button class="btn-inline slot-toggle-btn" type="button" data-slot-action="toggle-bot" data-slot="${i}">Remove Bot</button>` : ""}
+        </div>`);
+      continue;
+    }
+
+    const hostToggle = state.isHost
+      ? `<button class="btn-inline slot-toggle-btn" type="button" data-slot-action="toggle-bot" data-slot="${i}">Add Bot</button>`
+      : "";
+    slots.push(`
+      <div class="player-slot empty">
+        <span class="slot-dot"></span>
+        <span class="slot-name">Waiting for player…</span>
+        ${hostToggle}
+      </div>`);
   }
   el.playerSlots.innerHTML = slots.join("");
 
@@ -315,8 +422,8 @@ function renderWaitingRoom(data) {
   el.readyBtn.textContent = amReady ? "Not Ready" : "I'm Ready";
   el.readyBtn.className = amReady ? "btn-primary" : "btn-secondary";
 
-  // Start button (host only, all players ready, at least 2 players)
-  const canStart = state.isHost && allReady;
+  // Start button (host only, all humans ready, at least 2 active seats including bots)
+  const canStart = state.isHost && allHumansReady && activeSeatCount >= 2;
   el.startGameBtn.classList.toggle("hidden", !canStart);
 }
 
@@ -333,26 +440,80 @@ async function toggleReady() {
 
 async function updateRoomSettings() {
   if (!db || !state.roomCode || !state.isHost) return;
-  const maxPlayers = Number(el.maxPlayersSelect.value);
+  const seatedPlayers = normalizeRoomPlayers(state.roomData || {});
+  const requestedMaxPlayers = clampRoomSize(el.maxPlayersSelect.value);
+  const maxPlayers = Math.max(requestedMaxPlayers, seatedPlayers.length, MIN_ROOM_PLAYERS);
+  if (String(maxPlayers) !== String(el.maxPlayersSelect.value)) {
+    el.maxPlayersSelect.value = String(maxPlayers);
+  }
   const difficulty = el.botDifficultySelect.value;
-  await update(ref(db, `nertz_rooms/${state.roomCode}`), { maxPlayers, difficulty });
+  const occupiedSeats = new Set(seatedPlayers.map((player) => player.seat));
+  const currentBotSlots = getSanitizedBotSlots(state.roomData || {});
+  const botSlots = {};
+  Object.entries(currentBotSlots).forEach(([slotKey, enabled]) => {
+    if (!enabled) return;
+    const slot = Number(slotKey);
+    if (slot >= maxPlayers) return;
+    if (occupiedSeats.has(slot)) return;
+    botSlots[slot] = true;
+  });
+  await update(ref(db, `nertz_rooms/${state.roomCode}`), { maxPlayers, difficulty, botSlots });
+}
+
+async function toggleBotSlot(slot) {
+  if (!db || !state.roomCode || !state.isHost) return;
+  const maxPlayers = clampRoomSize(state.roomData?.maxPlayers || MAX_ROOM_PLAYERS);
+  if (!Number.isInteger(slot) || slot < 0 || slot >= maxPlayers) return;
+
+  const seatedPlayers = normalizeRoomPlayers(state.roomData || {});
+  const occupiedSeats = new Set(seatedPlayers.map((player) => player.seat));
+  if (occupiedSeats.has(slot)) return;
+
+  const botSlots = getSanitizedBotSlots(state.roomData || {});
+  if (botSlots[slot]) {
+    delete botSlots[slot];
+  } else {
+    botSlots[slot] = true;
+  }
+
+  await update(ref(db, `nertz_rooms/${state.roomCode}`), { botSlots });
+}
+
+async function onPlayerSlotAction(event) {
+  const actionBtn = event.target.closest("[data-slot-action]");
+  if (!actionBtn || !state.isHost) return;
+  const action = actionBtn.dataset.slotAction;
+  if (action === "toggle-bot") {
+    const slot = Number(actionBtn.dataset.slot);
+    if (Number.isInteger(slot)) {
+      await toggleBotSlot(slot);
+    }
+  }
 }
 
 // ── Start game ────────────────────────────────────────────────────────────────
 
 async function startGame() {
   if (!db || !state.roomCode || !state.isHost) return;
-  await update(ref(db, `nertz_rooms/${state.roomCode}`), { status: "starting" });
+  const data = state.roomData || {};
+  const seatedPlayers = normalizeRoomPlayers(data);
+  const activeSeatCount = seatedPlayers.length + countActiveBotSlots(data, seatedPlayers);
+  const allHumansReady = seatedPlayers.length > 0 && seatedPlayers.every((player) => Boolean(player.ready));
+  if (!allHumansReady || activeSeatCount < 2) return;
+  await update(ref(db, `nertz_rooms/${state.roomCode}`), {
+    status: "starting",
+    startedAt: Date.now()
+  });
 }
 
 function navigateToGame(roomData) {
   if (state.unsubRoom) { state.unsubRoom(); state.unsubRoom = null; }
-  const players = Object.values(roomData.players || {});
+  const maxPlayers = clampRoomSize(roomData.maxPlayers || MAX_ROOM_PLAYERS);
   const params = new URLSearchParams({
     room: roomData.code,
     pid: MY_ID,
     difficulty: roomData.difficulty || "medium",
-    playerCount: String(players.length)
+    playerCount: String(maxPlayers)
   });
   window.location.href = `index.html?${params.toString()}`;
 }
@@ -435,6 +596,7 @@ function init() {
   el.readyBtn.addEventListener("click", toggleReady);
   el.startGameBtn.addEventListener("click", startGame);
   el.leaveRoomBtn.addEventListener("click", () => leaveRoom(true));
+  el.playerSlots.addEventListener("click", onPlayerSlotAction);
   el.maxPlayersSelect.addEventListener("change", updateRoomSettings);
   el.botDifficultySelect.addEventListener("change", updateRoomSettings);
 

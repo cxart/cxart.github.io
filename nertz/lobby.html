@@ -198,6 +198,12 @@
         opacity: 0.45;
       }
 
+      .player-slot.bot-slot {
+        border-style: solid;
+        border-color: rgba(242, 184, 77, 0.32);
+        background: rgba(242, 184, 77, 0.08);
+      }
+
       .slot-dot {
         width: 10px;
         height: 10px;
@@ -231,6 +237,17 @@
       .slot-badge.host {
         background: rgba(242, 184, 77, 0.15);
         color: var(--accent);
+      }
+
+      .slot-toggle-btn {
+        margin-left: auto;
+        padding: 5px 10px;
+        font-size: 0.74rem;
+        line-height: 1.1;
+      }
+
+      .player-slot.empty .slot-toggle-btn {
+        opacity: 1;
       }
 
       .slot-ready-icon {

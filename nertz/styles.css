@@ -1032,6 +1032,65 @@ body[data-back-style="diamond"] {
     repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px);
 }
 
+#bot-row[data-bot-count="4"] .bot-seat {
+  padding: 8px 10px;
+}
+
+#bot-row[data-bot-count="4"] .bot-head {
+  overflow: hidden;
+}
+
+#bot-row[data-bot-count="4"] .bot-name {
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+#bot-row[data-bot-count="4"] .bot-meta {
+  font-size: 0.68rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+#bot-row[data-bot-count="4"] .bot-play-strip {
+  grid-template-columns: minmax(110px, 2fr) repeat(5, minmax(34px, 0.6fr));
+  gap: 4px;
+}
+
+#bot-row[data-bot-count="4"] .bot-lane {
+  padding: 4px;
+  min-height: calc((var(--card-h) * 0.62) + 30px);
+}
+
+#bot-row[data-bot-count="4"] .bot-pile-stack {
+  min-height: calc((var(--card-h) * 0.62) + 24px);
+}
+
+#bot-row[data-bot-count="4"] .bot-stock-stack {
+  width: calc(var(--card-w) * 0.62);
+  height: calc(var(--card-h) * 0.62);
+}
+
+#bot-row[data-bot-count="4"] .bot-waste-stack {
+  width: calc((var(--card-w) * 0.62) + 12px);
+  min-height: calc(var(--card-h) * 0.62);
+}
+
+#bot-row[data-bot-count="4"] .card.small {
+  width: calc(var(--card-w) * 0.62);
+  height: calc(var(--card-h) * 0.62);
+}
+
+#bot-row[data-bot-count="4"] .ghost-slot.small {
+  width: calc(var(--card-w) * 0.62);
+  height: calc(var(--card-h) * 0.62);
+}
+
 @media (min-width: 980px) {
   .bot-row {
     grid-template-columns: repeat(auto-fit, minmax(0, 1fr));

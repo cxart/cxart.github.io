@@ -58,7 +58,16 @@
       roomCode: "",
       playerId: "",
       roomData: null,
-      syncReady: false
+      syncReady: false,
+      db: null,
+      firebaseDb: null,
+      isHost: false,
+      gameRef: null,
+      intentsRef: null,
+      unsubGame: null,
+      unsubIntents: null,
+      rev: 0,
+      snapshotReady: false
     },
     players: [],
     centerPiles: [],
@@ -154,6 +163,7 @@
     document.addEventListener("keydown", onGlobalKeyDown);
     document.addEventListener("mousemove", onMouseMovePassive);
     window.addEventListener("resize", onViewportResize, { passive: true });
+    window.addEventListener("beforeunload", teardownOnlineSync);
     render();
     void maybeAutoLaunchOnlineMatch();
   }
@@ -227,6 +237,7 @@
     const roomData = await tryLoadOnlineRoomData(launch.roomCode);
     if (roomData) {
       state.online.roomData = roomData;
+      state.online.isHost = String(roomData?.hostId || "") === launch.playerId;
       const onlineConfig = buildOnlinePlayerSpecsFromRoom(roomData, launch);
       forcedSettings = {
         playerCount: onlineConfig.playerCount,
@@ -246,95 +257,176 @@
     if (!state.running) {
       startMatch({ forcedSettings, playerSpecs });
     }
+
+    if (state.online.syncReady) {
+      setupOnlineRealtimeSync();
+    }
   }
 
-  async function tryLoadOnlineRoomData(roomCode) {
+  async function ensureOnlineFirebase() {
+    if (state.online.db && state.online.firebaseDb) {
+      return true;
+    }
+
     try {
       const configModule = await import("./firebase-config.js");
       const cfg = configModule?.firebaseConfig || {};
       if (!cfg.apiKey || !cfg.databaseURL) {
-        return null;
+        return false;
       }
 
       const firebaseApp = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
       const firebaseDb = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-
       const appName = "nertz-game-client";
       const existing = firebaseApp.getApps().find((app) => app.name === appName);
       const app = existing || firebaseApp.initializeApp(cfg, appName);
-      const db = firebaseDb.getDatabase(app);
-      const snap = await firebaseDb.get(firebaseDb.ref(db, `nertz_rooms/${roomCode}`));
+      state.online.firebaseDb = firebaseDb;
+      state.online.db = firebaseDb.getDatabase(app);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
 
-      if (!snap.exists()) {
-        return null;
-      }
-
-      return snap.val();
+  async function tryLoadOnlineRoomData(roomCode) {
+    const ready = await ensureOnlineFirebase();
+    if (!ready) {
+      return null;
+    }
+    try {
+      const firebaseDb = state.online.firebaseDb;
+      const snap = await firebaseDb.get(firebaseDb.ref(state.online.db, `nertz_rooms/${roomCode}`));
+      return snap.exists() ? snap.val() : null;
     } catch (error) {
       return null;
     }
   }
 
-  function buildOnlinePlayerSpecsFromRoom(roomData, launch) {
-    const roomPlayers = Object.values(roomData?.players || {}).sort((a, b) => {
+  function normalizeRoomPlayersBySeat(roomData) {
+    const maxPlayers = clamp(Number(roomData?.maxPlayers) || 4, 2, 4);
+    const players = Object.values(roomData?.players || {}).sort((a, b) => {
       const left = Number(a?.joinedAt) || 0;
       const right = Number(b?.joinedAt) || 0;
-      if (left !== right) {
-        return left - right;
-      }
+      if (left !== right) return left - right;
       return String(a?.id || "").localeCompare(String(b?.id || ""));
     });
 
-    let me = roomPlayers.find((player) => String(player?.id) === launch.playerId);
-    if (!me) {
-      me = {
-        id: launch.playerId,
-        name: localStorage.getItem("nertz_player_name") || "You",
-        cardBack: state.settings.cardBackConfig
-      };
+    const usedSeats = new Set();
+    const withSeat = [];
+    const unresolved = [];
+    for (const player of players) {
+      const seat = Number(player?.seat);
+      if (Number.isInteger(seat) && seat >= 0 && seat < maxPlayers && !usedSeats.has(seat)) {
+        withSeat.push({ ...player, seat });
+        usedSeats.add(seat);
+      } else {
+        unresolved.push(player);
+      }
     }
 
-    const others = roomPlayers.filter((player) => String(player?.id) !== launch.playerId);
-    const targetCount = clamp(Math.max(2, roomPlayers.length, launch.playerCount), 2, 4);
-    const playerSpecs = [
-      {
-        name: me?.name || "You",
-        isHuman: true,
-        isNetworkPlayer: false,
-        networkId: launch.playerId,
-        difficulty: roomData?.difficulty || launch.difficulty,
-        cardBack: sanitizeCardBack(me?.cardBack, state.settings.cardBackConfig)
-      }
-    ];
-
-    for (const player of others) {
-      if (playerSpecs.length >= targetCount) {
-        break;
-      }
-      playerSpecs.push({
-        name: player?.name || `Player ${playerSpecs.length + 1}`,
-        isHuman: false,
-        isNetworkPlayer: true,
-        networkId: player?.id || null,
-        difficulty: roomData?.difficulty || launch.difficulty,
-        cardBack: sanitizeCardBack(player?.cardBack, null)
-      });
+    for (const player of unresolved) {
+      let seat = 0;
+      while (usedSeats.has(seat) && seat < maxPlayers) seat += 1;
+      if (seat >= maxPlayers) continue;
+      withSeat.push({ ...player, seat });
+      usedSeats.add(seat);
     }
 
-    while (playerSpecs.length < targetCount) {
-      playerSpecs.push({
-        name: BOT_NAMES[playerSpecs.length - 1] || `Bot ${playerSpecs.length}`,
+    return withSeat.sort((a, b) => a.seat - b.seat);
+  }
+
+  function sanitizeRoomBotSlots(roomData) {
+    const maxPlayers = clamp(Number(roomData?.maxPlayers) || 4, 2, 4);
+    const raw = roomData?.botSlots || {};
+    const out = {};
+    for (const [slotKey, enabled] of Object.entries(raw)) {
+      if (!enabled) continue;
+      const slot = Number(slotKey);
+      if (!Number.isInteger(slot) || slot < 0 || slot >= maxPlayers) continue;
+      out[slot] = true;
+    }
+    return out;
+  }
+
+  function botBackForSeat(seatIdx) {
+    const pattern = BACK_PATTERNS[(seatIdx * 3 + 1) % BACK_PATTERNS.length];
+    const palette = BACK_PALETTES[(seatIdx * 5 + 2) % BACK_PALETTES.length];
+    return { pattern, color1: palette[0], color2: palette[1] };
+  }
+
+  function deriveSeatPlanFromRoom(roomData) {
+    const maxPlayers = clamp(Number(roomData?.maxPlayers) || 4, 2, 4);
+    const seatedPlayers = normalizeRoomPlayersBySeat(roomData);
+    const playersBySeat = new Map(seatedPlayers.map((player) => [player.seat, player]));
+    const botSlots = sanitizeRoomBotSlots(roomData);
+    const plan = [];
+
+    for (let slot = 0; slot < maxPlayers; slot += 1) {
+      const human = playersBySeat.get(slot);
+      if (human) {
+        plan.push({ slot, kind: "human", player: human });
+      } else if (botSlots[slot]) {
+        plan.push({ slot, kind: "bot" });
+      }
+    }
+
+    return plan;
+  }
+
+  function buildOnlinePlayerSpecsFromRoom(roomData, launch) {
+    const seatPlan = deriveSeatPlanFromRoom(roomData);
+    const difficulty = normalizeDifficulty(roomData?.difficulty || launch.difficulty);
+    const specs = seatPlan.map((seat) => {
+      if (seat.kind === "human") {
+        const player = seat.player || {};
+        const networkId = String(player?.id || "");
+        const isLocal = networkId === launch.playerId;
+        return {
+          name: player?.name || `Player ${seat.slot + 1}`,
+          isHuman: isLocal,
+          isNetworkPlayer: !isLocal,
+          networkId: networkId || null,
+          difficulty,
+          cardBack: sanitizeCardBack(player?.cardBack, isLocal ? state.settings.cardBackConfig : null)
+        };
+      }
+
+      return {
+        name: BOT_NAMES[seat.slot - 1] || `Bot ${seat.slot + 1}`,
         isHuman: false,
         isNetworkPlayer: false,
         networkId: null,
-        difficulty: roomData?.difficulty || launch.difficulty
+        difficulty,
+        cardBack: botBackForSeat(seat.slot)
+      };
+    });
+
+    if (!specs.some((spec) => String(spec.networkId || "") === launch.playerId)) {
+      specs.unshift({
+        name: localStorage.getItem("nertz_player_name") || "You",
+        isHuman: true,
+        isNetworkPlayer: false,
+        networkId: launch.playerId,
+        difficulty,
+        cardBack: state.settings.cardBackConfig
+      });
+    }
+
+    while (specs.length < 2) {
+      specs.push({
+        name: BOT_NAMES[specs.length - 1] || `Bot ${specs.length + 1}`,
+        isHuman: false,
+        isNetworkPlayer: false,
+        networkId: null,
+        difficulty,
+        cardBack: botBackForSeat(specs.length + 1)
       });
     }
 
     return {
-      playerCount: targetCount,
-      difficulty: normalizeDifficulty(roomData?.difficulty || launch.difficulty),
-      playerSpecs
+      playerCount: specs.length,
+      difficulty,
+      playerSpecs: specs.slice(0, 4)
     };
   }
 
@@ -377,6 +469,220 @@
     };
   }
 
+  function getLocalPlayer() {
+    if (state.online.enabled && state.online.playerId) {
+      const local = state.players.find((player) => String(player.networkId || "") === state.online.playerId);
+      if (local) return local;
+    }
+    return state.players.find((player) => player.isHuman) || state.players[0] || null;
+  }
+
+  function normalizeOnlinePlayerFlags(player) {
+    const networkId = player?.networkId ? String(player.networkId) : null;
+    const isLocal = Boolean(state.online.enabled && networkId && networkId === state.online.playerId);
+    return {
+      ...player,
+      networkId,
+      isHuman: isLocal,
+      isNetworkPlayer: Boolean(networkId && !isLocal),
+      cardBack: sanitizeCardBack(player?.cardBack, state.settings.cardBackConfig)
+    };
+  }
+
+  function cloneJson(value, fallback) {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function buildOnlineSnapshot() {
+    return {
+      rev: state.online.rev || 0,
+      running: Boolean(state.running),
+      winnerId: state.winnerId,
+      players: cloneJson(state.players, []),
+      centerPiles: cloneJson(state.centerPiles, []),
+      centerPileSlots: cloneJson(state.centerPileSlots, []),
+      completedCenterSlots: Array.from(state.completedCenterSlots),
+      logs: cloneJson(state.logs, []),
+      lastActivityAt: state.lastActivityAt || Date.now(),
+      lastNertzPlayAt: state.lastNertzPlayAt || Date.now(),
+      rotateProposed: Boolean(state.rotateProposed)
+    };
+  }
+
+  function hydrateFromOnlineSnapshot(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.players)) {
+      return;
+    }
+
+    state.online.rev = Number(snapshot.rev) || state.online.rev || 0;
+    state.online.snapshotReady = true;
+    state.running = Boolean(snapshot.running);
+    state.winnerId = snapshot.winnerId ?? null;
+    state.players = (snapshot.players || []).map((player) => normalizeOnlinePlayerFlags(player));
+    state.centerPiles = cloneJson(snapshot.centerPiles, []);
+    state.centerPileSlots = cloneJson(snapshot.centerPileSlots, []);
+    state.completedCenterSlots = new Set(Array.isArray(snapshot.completedCenterSlots) ? snapshot.completedCenterSlots : []);
+    state.logs = Array.isArray(snapshot.logs) ? snapshot.logs.slice(0, LOG_LIMIT) : [];
+    state.lastActivityAt = Number(snapshot.lastActivityAt) || Date.now();
+    state.lastNertzPlayAt = Number(snapshot.lastNertzPlayAt) || state.lastActivityAt;
+    state.rotateProposed = Boolean(snapshot.rotateProposed);
+    state.selected = null;
+    state.dealAnimating = false;
+    state.awaitingReady = false;
+    state.readyByPlayerId = {};
+    clearDragging();
+    clearPendingPointer();
+    clearSelectionGhost();
+    if (!state.running && state.winnerId !== null) {
+      const winner = state.players.find((player) => player.id === state.winnerId);
+      if (winner) {
+        openEndModal(winner);
+      }
+    } else {
+      el.endModal.classList.add("hidden");
+    }
+    render();
+  }
+
+  function publishOnlineSnapshot() {
+    if (!state.online.enabled || !state.online.isHost || !state.online.gameRef || !state.online.firebaseDb) {
+      return;
+    }
+    const nextRev = (Number(state.online.rev) || 0) + 1;
+    state.online.rev = nextRev;
+    const payload = buildOnlineSnapshot();
+    payload.rev = nextRev;
+    payload.updatedBy = state.online.playerId;
+    payload.updatedAt = Date.now();
+    state.online.firebaseDb.set(state.online.gameRef, payload).catch(() => {});
+  }
+
+  function submitOnlineIntent(move) {
+    if (!state.online.enabled || state.online.isHost || !state.online.intentsRef || !state.online.firebaseDb) {
+      return false;
+    }
+
+    const localPlayer = getLocalPlayer();
+    if (!localPlayer || !localPlayer.networkId) {
+      return false;
+    }
+
+    const movePayload = cloneJson(move, null);
+    if (!movePayload) {
+      return false;
+    }
+    if (movePayload.kind === "toCenter") {
+      delete movePayload.centerTarget;
+    }
+
+    const payload = {
+      actorId: String(localPlayer.networkId),
+      move: movePayload,
+      createdAt: Date.now()
+    };
+    state.online.firebaseDb.push(state.online.intentsRef, payload).catch(() => {
+      announce("Move failed", "Unable to send move to host.", 1500);
+    });
+    return true;
+  }
+
+  function processOnlineIntent(intentKey, intent) {
+    if (!state.online.isHost || !intent || typeof intent !== "object") {
+      return;
+    }
+
+    const actorId = String(intent.actorId || "");
+    const move = intent.move || null;
+    const actor = state.players.find((player) => String(player.networkId || "") === actorId);
+    let moved = false;
+    if (actor && move && !state.dealAnimating && !state.awaitingReady && state.running) {
+      moved = applyMove(actor, move, false);
+      if (moved) {
+        publishOnlineSnapshot();
+      }
+    }
+
+    if (!moved && intent?.move?.kind) {
+      addLog(`<strong>${actor?.name || "Player"}</strong> attempted an invalid move.`);
+    }
+
+    const intentRef = state.online.firebaseDb.ref(
+      state.online.db,
+      `nertz_rooms/${state.online.roomCode}/intents/${intentKey}`
+    );
+    state.online.firebaseDb.remove(intentRef).catch(() => {});
+  }
+
+  function setupOnlineRealtimeSync() {
+    if (!state.online.enabled || !state.online.firebaseDb || !state.online.db || !state.online.roomCode) {
+      return;
+    }
+
+    if (state.online.unsubGame) {
+      state.online.unsubGame();
+      state.online.unsubGame = null;
+    }
+    if (state.online.unsubIntents) {
+      state.online.unsubIntents();
+      state.online.unsubIntents = null;
+    }
+
+    const firebaseDb = state.online.firebaseDb;
+    state.online.gameRef = firebaseDb.ref(state.online.db, `nertz_rooms/${state.online.roomCode}/game`);
+    state.online.intentsRef = firebaseDb.ref(state.online.db, `nertz_rooms/${state.online.roomCode}/intents`);
+
+    state.online.unsubGame = firebaseDb.onValue(state.online.gameRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        return;
+      }
+      const payload = snapshot.val();
+      if (!payload || !Array.isArray(payload.players)) {
+        return;
+      }
+      if (
+        state.online.isHost &&
+        payload.updatedBy === state.online.playerId &&
+        Number(payload.rev) === Number(state.online.rev)
+      ) {
+        return;
+      }
+      hydrateFromOnlineSnapshot(payload);
+    });
+
+    state.online.snapshotReady = state.online.isHost;
+
+    if (state.online.isHost) {
+      state.online.unsubIntents = firebaseDb.onValue(state.online.intentsRef, (snapshot) => {
+        const intents = snapshot.val() || {};
+        const ordered = Object.entries(intents).sort((a, b) => {
+          const left = Number(a[1]?.createdAt) || 0;
+          const right = Number(b[1]?.createdAt) || 0;
+          if (left !== right) return left - right;
+          return String(a[0]).localeCompare(String(b[0]));
+        });
+        for (const [intentKey, intent] of ordered) {
+          processOnlineIntent(intentKey, intent);
+        }
+      });
+      publishOnlineSnapshot();
+    }
+  }
+
+  function teardownOnlineSync() {
+    if (state.online.unsubGame) {
+      state.online.unsubGame();
+      state.online.unsubGame = null;
+    }
+    if (state.online.unsubIntents) {
+      state.online.unsubIntents();
+      state.online.unsubIntents = null;
+    }
+  }
+
   function startMatch(options = {}) {
     clearDragging();
     clearSelectionGhost();
@@ -391,6 +697,9 @@
     }
 
     state.players = createPlayers(state.settings.playerCount, state.settings.difficulty, options.playerSpecs || null);
+    if (state.online.enabled) {
+      state.players = state.players.map((player) => normalizeOnlinePlayerFlags(player));
+    }
     state.centerPiles = [];
     state.centerPileSlots = [];
     state.completedCenterSlots = new Set();
@@ -412,7 +721,7 @@
     addLog("<strong>Round start.</strong> Race to empty your Nertz pile.");
     if (state.online.enabled && state.online.roomCode) {
       if (state.online.syncReady) {
-        addLog(`<strong>Online room ${state.online.roomCode} connected.</strong> Multiplayer sync wiring is in progress.`);
+        addLog(`<strong>Online room ${state.online.roomCode} connected.</strong> Shared match sync enabled.`);
       } else {
         addLog(`<strong>Online room ${state.online.roomCode}.</strong> Firebase sync unavailable; running local preview.`);
       }
@@ -432,6 +741,14 @@
 
     state.tickHandle = setInterval(gameTick, 90);
     render();
+    if (state.online.enabled) {
+      finalizeDealVisibility();
+      state.dealAnimating = false;
+      state.awaitingReady = false;
+      state.readyByPlayerId = {};
+      render();
+      return;
+    }
     runInitialDealAnimation(state.dealToken);
   }
 
@@ -590,6 +907,9 @@
   }
 
   function executeRotate() {
+    if (state.online.enabled && !state.online.isHost) {
+      return;
+    }
     state.rotateProposed = false;
     state.lastReshuffle = Date.now();
     state.lastActivityAt = Date.now();
@@ -597,11 +917,18 @@
     for (const player of state.players) reshuffleDrawPile(player);
     announce("Draw piles rotated!", "Top card moved to bottom of each draw pile.", 2500);
     addLog("<strong>Draw piles rotated.</strong> Top card moved to bottom of each draw pile.");
+    if (state.online.enabled && state.online.isHost) {
+      publishOnlineSnapshot();
+    }
     render();
   }
 
   function gameTick() {
     if (!state.running) {
+      return;
+    }
+
+    if (state.online.enabled && !state.online.isHost) {
       return;
     }
 
@@ -616,6 +943,7 @@
 
     const now = performance.now();
 
+    let changed = false;
     for (const player of state.players) {
       if (player.isHuman || player.isNetworkPlayer) {
         continue;
@@ -623,6 +951,9 @@
 
       if (now >= player.nextActionAt) {
         const acted = botTakeAction(player);
+        if (acted) {
+          changed = true;
+        }
         const cfg = DIFFICULTY[player.difficulty] || DIFFICULTY.medium;
         const delay = randomInt(cfg.minDelay, cfg.maxDelay);
         player.nextActionAt = now + (acted ? delay : Math.floor(delay * 0.78));
@@ -633,7 +964,11 @@
       }
     }
 
+    const rotateBefore = state.rotateProposed;
     checkStuck();
+    if ((changed || rotateBefore !== state.rotateProposed) && state.online.enabled && state.online.isHost) {
+      publishOnlineSnapshot();
+    }
     render();
   }
 
@@ -1474,6 +1809,8 @@
     if (player.isHuman) {
       state.selected = null;
       addLog(`<strong>You</strong> flipped ${picks.length} card${picks.length > 1 ? "s" : ""}.`);
+    } else if (player.isNetworkPlayer) {
+      addLog(`<strong>${player.name}</strong> flipped ${picks.length} card${picks.length > 1 ? "s" : ""}.`);
     }
 
     return true;
@@ -1862,6 +2199,9 @@
 
     addLog(`<strong>${winner.name}</strong> emptied their Nertz pile.`);
     openEndModal(winner);
+    if (state.online.enabled && state.online.isHost) {
+      publishOnlineSnapshot();
+    }
   }
 
   function openEndModal(winner) {
@@ -1949,7 +2289,13 @@
   }
 
   function onPointerDown(event) {
-    if (!state.running || state.dealAnimating || state.awaitingReady || event.button !== 0) {
+    if (
+      !state.running ||
+      state.dealAnimating ||
+      state.awaitingReady ||
+      event.button !== 0 ||
+      (state.online.enabled && !state.online.isHost && !state.online.snapshotReady)
+    ) {
       return;
     }
 
@@ -1958,7 +2304,7 @@
       return;
     }
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     if (!human) {
       return;
     }
@@ -2060,7 +2406,7 @@
 
     event.preventDefault();
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     const source = state.dragging.source;
     let target = getTargetAtPoint(event.clientX, event.clientY);
     if (human && target) {
@@ -2070,13 +2416,13 @@
 
     if (human && target && canMoveSourceToTarget(human, source, target)) {
       if (target.type === "center") {
-        moved = applyMove(human, {
+        moved = performHumanMove(human, {
           kind: "toCenter",
           source,
           centerTarget: target.centerTarget
         });
       } else if (target.type === "tableau") {
-        moved = applyMove(human, {
+        moved = performHumanMove(human, {
           kind: "toTableau",
           source,
           toPile: target.toPile
@@ -2117,7 +2463,12 @@
   }
 
   function onGlobalKeyDown(event) {
-    if (!state.running || state.dealAnimating || state.awaitingReady) {
+    if (
+      !state.running ||
+      state.dealAnimating ||
+      state.awaitingReady ||
+      (state.online.enabled && !state.online.isHost && !state.online.snapshotReady)
+    ) {
       return;
     }
 
@@ -2142,17 +2493,42 @@
     }
   }
 
+  function performHumanMove(human, move) {
+    if (!human || !move) {
+      return false;
+    }
+
+    if (state.online.enabled && !state.online.isHost) {
+      if (!state.online.snapshotReady) {
+        announce("Syncing game", "Waiting for the host's game state.", 1200);
+        return false;
+      }
+      return submitOnlineIntent(move);
+    }
+
+    const moved = applyMove(human, move, false);
+    if (moved && state.online.enabled && state.online.isHost) {
+      publishOnlineSnapshot();
+    }
+    return moved;
+  }
+
   function onHumanDraw() {
-    if (!state.running || state.dealAnimating || state.awaitingReady) {
+    if (
+      !state.running ||
+      state.dealAnimating ||
+      state.awaitingReady ||
+      (state.online.enabled && !state.online.isHost && !state.online.snapshotReady)
+    ) {
       return;
     }
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     if (!human) {
       return;
     }
 
-    const ok = applyMove(human, { kind: "draw" });
+    const ok = performHumanMove(human, { kind: "draw" });
     if (!ok) {
       announce("No cards to draw", "Your hand is empty.", 1500);
     }
@@ -2160,11 +2536,16 @@
   }
 
   function onSourcePicked(sourceEl) {
-    if (!state.running || state.dealAnimating || state.awaitingReady) {
+    if (
+      !state.running ||
+      state.dealAnimating ||
+      state.awaitingReady ||
+      (state.online.enabled && !state.online.isHost && !state.online.snapshotReady)
+    ) {
       return;
     }
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     if (!human) {
       return;
     }
@@ -2180,13 +2561,13 @@
       if (target && canMoveSourceToTarget(human, state.selected, target)) {
         let moved = false;
         if (target.type === "center") {
-          moved = applyMove(human, {
+          moved = performHumanMove(human, {
             kind: "toCenter",
             source: state.selected,
             centerTarget: target.centerTarget
           });
         } else if (target.type === "tableau") {
-          moved = applyMove(human, {
+          moved = performHumanMove(human, {
             kind: "toTableau",
             source: state.selected,
             toPile: target.toPile
@@ -2194,6 +2575,8 @@
         }
 
         if (moved) {
+          state.selected = null;
+          clearSelectionGhost();
           render();
           return;
         }
@@ -2227,11 +2610,17 @@
   }
 
   function onTargetPicked(targetEl, clientX = state.mouseX, clientY = state.mouseY) {
-    if (!state.running || state.dealAnimating || state.awaitingReady || !state.selected) {
+    if (
+      !state.running ||
+      state.dealAnimating ||
+      state.awaitingReady ||
+      !state.selected ||
+      (state.online.enabled && !state.online.isHost && !state.online.snapshotReady)
+    ) {
       return;
     }
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     if (!human) {
       return;
     }
@@ -2245,20 +2634,23 @@
     let ok = false;
 
     if (normalizedTarget.type === "center") {
-      ok = applyMove(human, {
+      ok = performHumanMove(human, {
         kind: "toCenter",
         source: state.selected,
         centerTarget: normalizedTarget.centerTarget
       });
     } else if (normalizedTarget.type === "tableau") {
-      ok = applyMove(human, {
+      ok = performHumanMove(human, {
         kind: "toTableau",
         source: state.selected,
         toPile: normalizedTarget.toPile
       });
     }
 
-    if (!ok) {
+    if (ok) {
+      state.selected = null;
+      clearSelectionGhost();
+    } else {
       state.selected = null;
       clearSelectionGhost();
       announce("Illegal destination", "That move is not allowed by your current rules.", 1800);
@@ -2352,7 +2744,7 @@
       return;
     }
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     const target = getTargetAtPoint(clientX, clientY);
     if (!human || !target) {
       setHoveredTargetEl(null);
@@ -2461,7 +2853,7 @@
       return;
     }
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     const picked = human ? pickSourceCard(human, state.selected, false) : null;
     if (!picked) {
       clearSelectionGhost();
@@ -2493,6 +2885,10 @@
     renderLog();
     syncSelectionGhost();
     if (el.forceReshuffleBtn) {
+      if (state.online.enabled && !state.online.isHost) {
+        el.forceReshuffleBtn.style.display = "none";
+        return;
+      }
       const active = state.running && !state.dealAnimating && !state.awaitingReady;
 
       // If rotation was proposed but a valid move appeared, cancel the proposal
@@ -2528,6 +2924,9 @@
     if (state.alert && Date.now() <= state.alert.expiresAt) {
       title = state.alert.title;
       text = state.alert.text;
+    } else if (state.online.enabled && !state.online.isHost && !state.online.snapshotReady) {
+      title = "Syncing";
+      text = "Waiting for host game state…";
     } else if (state.running && state.awaitingReady) {
       title = "Ready check";
       text = "Click to indicate ready.";
@@ -2543,7 +2942,7 @@
     el.statusTitle.textContent = title;
     el.statusText.textContent = text;
 
-    const human = state.players[0];
+    const human = getLocalPlayer();
     if (human) {
       el.metricCenter.textContent = `Center: ${human.centerPlayed}`;
       el.metricNertz.textContent = `Nertz Left: ${human.nertz.length}`;
@@ -2713,7 +3112,7 @@
   }
 
   function renderHumanArea() {
-    const human = state.players[0];
+    const human = getLocalPlayer();
     if (!human) {
       el.nertzSpot.innerHTML = "";
       el.drawSpot.innerHTML = "";
