@@ -61,6 +61,7 @@ const MY_ID = getPlayerId();
 const CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
 const MIN_ROOM_PLAYERS = 2;
 const MAX_ROOM_PLAYERS = 4;
+const MP_DEBUG_PREFIX = "[NERTZ-MP-DEBUG][lobby]";
 
 function randomCode() {
   return Array.from({ length: 4 }, () =>
@@ -72,6 +73,35 @@ function clampRoomSize(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return MAX_ROOM_PLAYERS;
   return Math.max(MIN_ROOM_PLAYERS, Math.min(MAX_ROOM_PLAYERS, Math.floor(n)));
+}
+
+function logLobby(event, details) {
+  if (details === undefined) {
+    console.log(`${MP_DEBUG_PREFIX} ${event}`);
+    return;
+  }
+  console.log(`${MP_DEBUG_PREFIX} ${event}`, details);
+}
+
+function summarizeRoom(room) {
+  const source = room || {};
+  const seatedPlayers = normalizeRoomPlayers(source);
+  const botSlots = getSanitizedBotSlots(source);
+  const maxPlayers = clampRoomSize(source.maxPlayers || MAX_ROOM_PLAYERS);
+  return {
+    code: source.code || null,
+    status: source.status || null,
+    hostId: source.hostId || null,
+    maxPlayers,
+    difficulty: source.difficulty || null,
+    seatedPlayers: seatedPlayers.map((player) => ({
+      id: player.id,
+      name: player.name,
+      seat: player.seat,
+      ready: Boolean(player.ready)
+    })),
+    botSlots: Object.keys(botSlots).map((slot) => Number(slot)).sort((a, b) => a - b)
+  };
 }
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -135,6 +165,11 @@ function watchRooms() {
     // Exclude stale rooms (> 2h old)
     const cutoff = Date.now() - 2 * 60 * 60 * 1000;
     const fresh = rooms.filter(r => r.createdAt > cutoff);
+    logLobby("watchRooms snapshot", {
+      totalWaitingRooms: rooms.length,
+      freshWaitingRooms: fresh.length,
+      rooms: fresh.map((room) => summarizeRoom(room))
+    });
     renderRoomList(fresh);
   });
   state.unsubRooms = unsub;
@@ -203,7 +238,14 @@ async function createRoom() {
     }
   };
 
+  logLobby("createRoom write", {
+    requestedBy: MY_ID,
+    hostName: name,
+    room: summarizeRoom(roomData)
+  });
+
   await set(ref(db, `nertz_rooms/${code}`), roomData);
+  logLobby("createRoom success", { code, hostId: MY_ID });
 
   // Auto-delete my player slot on disconnect
   onDisconnect(ref(db, `nertz_rooms/${code}/players/${MY_ID}`)).remove();
@@ -219,6 +261,7 @@ async function joinRoom(code) {
   if (!db) return;
   code = code.toUpperCase().trim();
   const name = myName();
+  logLobby("joinRoom attempt", { code, playerId: MY_ID, name });
 
   showJoinError("");
 
@@ -226,15 +269,26 @@ async function joinRoom(code) {
   if (!snap.exists()) { showJoinError("Room not found."); return; }
 
   const room = snap.val();
+  logLobby("joinRoom room snapshot", summarizeRoom(room));
   if (room.status !== "waiting") { showJoinError("That game has already started."); return; }
 
   const seatedPlayers = normalizeRoomPlayers(room);
   const seat = firstOpenHumanSeat(room, seatedPlayers);
-  if (seat < 0) { showJoinError("Room is full."); return; }
+  if (seat < 0) {
+    logLobby("joinRoom blocked full", {
+      code,
+      playerId: MY_ID,
+      seatedPlayers: seatedPlayers.map((player) => ({ id: player.id, seat: player.seat })),
+      botSlots: Object.keys(getSanitizedBotSlots(room)).map((slot) => Number(slot)).sort((a, b) => a - b)
+    });
+    showJoinError("Room is full.");
+    return;
+  }
 
   await update(ref(db, `nertz_rooms/${code}/players/${MY_ID}`), {
     id: MY_ID, seat, name, ready: false, joinedAt: Date.now(), cardBack: getCardBack()
   });
+  logLobby("joinRoom success", { code, playerId: MY_ID, seat, name });
 
   // Auto-remove on disconnect
   onDisconnect(ref(db, `nertz_rooms/${code}/players/${MY_ID}`)).remove();
@@ -245,6 +299,9 @@ async function joinRoom(code) {
 function showJoinError(msg) {
   el.joinError.textContent = msg;
   el.joinError.classList.toggle("hidden", !msg);
+  if (msg) {
+    logLobby("join error", { message: msg });
+  }
 }
 
 function sortPlayersByJoin(players) {
@@ -326,6 +383,7 @@ function countActiveBotSlots(room, seatedPlayers) {
 function enterRoom(code, isHost) {
   state.roomCode = code;
   state.isHost = isHost;
+  logLobby("enterRoom", { code, isHost, playerId: MY_ID });
 
   el.roomCodeValue.textContent = code;
   el.hostSettings.classList.toggle("hidden", !isHost);
@@ -345,10 +403,12 @@ function watchRoom(code) {
   const unsub = onValue(ref(db, `nertz_rooms/${code}`), snapshot => {
     if (!snapshot.exists()) {
       // Room was deleted (host left)
+      logLobby("watchRoom removed", { code });
       leaveRoom(false);
       return;
     }
     const data = snapshot.val();
+    logLobby("watchRoom snapshot", summarizeRoom(data));
     state.roomData = data;
     renderWaitingRoom(data);
 
@@ -424,6 +484,23 @@ function renderWaitingRoom(data) {
 
   // Start button (host only, all humans ready, at least 2 active seats including bots)
   const canStart = state.isHost && allHumansReady && activeSeatCount >= 2;
+  logLobby("renderWaitingRoom", {
+    roomCode: data?.code || state.roomCode,
+    viewerId: MY_ID,
+    isHost: state.isHost,
+    seatedPlayers: seatedPlayers.map((player) => ({
+      id: player.id,
+      name: player.name,
+      seat: player.seat,
+      ready: Boolean(player.ready)
+    })),
+    botSlots: Object.keys(botSlots).map((slot) => Number(slot)).sort((a, b) => a - b),
+    maxPlayers,
+    activeBotCount,
+    activeSeatCount,
+    allHumansReady,
+    canStart
+  });
   el.startGameBtn.classList.toggle("hidden", !canStart);
 }
 
@@ -457,6 +534,14 @@ async function updateRoomSettings() {
     if (occupiedSeats.has(slot)) return;
     botSlots[slot] = true;
   });
+  logLobby("updateRoomSettings", {
+    roomCode: state.roomCode,
+    requestedMaxPlayers: requestedMaxPlayers,
+    appliedMaxPlayers: maxPlayers,
+    difficulty,
+    occupiedSeats: Array.from(occupiedSeats).sort((a, b) => a - b),
+    botSlots: Object.keys(botSlots).map((slot) => Number(slot)).sort((a, b) => a - b)
+  });
   await update(ref(db, `nertz_rooms/${state.roomCode}`), { maxPlayers, difficulty, botSlots });
 }
 
@@ -467,7 +552,14 @@ async function toggleBotSlot(slot) {
 
   const seatedPlayers = normalizeRoomPlayers(state.roomData || {});
   const occupiedSeats = new Set(seatedPlayers.map((player) => player.seat));
-  if (occupiedSeats.has(slot)) return;
+  if (occupiedSeats.has(slot)) {
+    logLobby("toggleBotSlot blocked occupied seat", {
+      roomCode: state.roomCode,
+      slot,
+      occupiedSeats: Array.from(occupiedSeats).sort((a, b) => a - b)
+    });
+    return;
+  }
 
   const botSlots = getSanitizedBotSlots(state.roomData || {});
   if (botSlots[slot]) {
@@ -475,6 +567,11 @@ async function toggleBotSlot(slot) {
   } else {
     botSlots[slot] = true;
   }
+  logLobby("toggleBotSlot", {
+    roomCode: state.roomCode,
+    slot,
+    botSlots: Object.keys(botSlots).map((value) => Number(value)).sort((a, b) => a - b)
+  });
 
   await update(ref(db, `nertz_rooms/${state.roomCode}`), { botSlots });
 }
@@ -499,11 +596,24 @@ async function startGame() {
   const seatedPlayers = normalizeRoomPlayers(data);
   const activeSeatCount = seatedPlayers.length + countActiveBotSlots(data, seatedPlayers);
   const allHumansReady = seatedPlayers.length > 0 && seatedPlayers.every((player) => Boolean(player.ready));
-  if (!allHumansReady || activeSeatCount < 2) return;
+  logLobby("startGame attempt", {
+    roomCode: state.roomCode,
+    hostId: MY_ID,
+    seatedPlayers: seatedPlayers.map((player) => ({ id: player.id, seat: player.seat, ready: Boolean(player.ready) })),
+    activeSeatCount,
+    allHumansReady
+  });
+  if (!allHumansReady || activeSeatCount < 2) {
+    logLobby("startGame blocked", {
+      reason: !allHumansReady ? "not_all_humans_ready" : "not_enough_active_seats"
+    });
+    return;
+  }
   await update(ref(db, `nertz_rooms/${state.roomCode}`), {
     status: "starting",
     startedAt: Date.now()
   });
+  logLobby("startGame set starting", { roomCode: state.roomCode });
 }
 
 function navigateToGame(roomData) {
@@ -516,6 +626,12 @@ function navigateToGame(roomData) {
     pid: MY_ID,
     difficulty: roomData.difficulty || "medium",
     playerCount: String(playerCount)
+  });
+  logLobby("navigateToGame", {
+    room: summarizeRoom(roomData),
+    playerId: MY_ID,
+    playerCount,
+    query: Object.fromEntries(params.entries())
   });
   window.location.href = `index.html?${params.toString()}`;
 }

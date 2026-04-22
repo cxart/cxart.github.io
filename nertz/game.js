@@ -16,7 +16,7 @@
     12: "Q",
     13: "K"
   };
-  const BOT_NAMES = ["North Bot", "Ridge Bot", "Copper Bot"];
+  const BOT_NAMES = ["Botney Spears", "Bot Jovi", "Nertz Potter", "Botsy Ross", "Botica Lewinsky", "Barack Obotma", "Dwayne the Bot Johnson", "Elon Nertzk", "Donertz Trump", "Spongebot Squarepants"].sort(() => Math.random() - 0.5);
   const LOG_LIMIT = 24;
   const HUMAN_PILE_STEP = 18;
   const BOT_PILE_STEP = 11;
@@ -25,6 +25,7 @@
   const BASE_CENTER_SLOT_COUNT = 10;
   const CENTER_SLOT_COLUMNS = 10;
   const BOT_STACK_BREAKPOINT = 900;
+  const MP_DEBUG_PREFIX = "[NERTZ-MP-DEBUG][game]";
 
   const DIFFICULTY = {
     easy: { minDelay: 1300, maxDelay: 2300, skill: 0.34, idleChance: 0.34 },
@@ -126,6 +127,54 @@
     forceReshuffleBtn: document.getElementById("force-reshuffle-btn")
   };
 
+  function logOnline(event, details) {
+    if (details === undefined) {
+      console.log(`${MP_DEBUG_PREFIX} ${event}`);
+      return;
+    }
+    console.log(`${MP_DEBUG_PREFIX} ${event}`, details);
+  }
+
+  function summarizeSeatPlan(plan) {
+    if (!Array.isArray(plan)) {
+      return [];
+    }
+    return plan.map((seat) => ({
+      slot: seat.slot,
+      kind: seat.kind,
+      playerId: seat.player?.id || null,
+      playerName: seat.player?.name || null
+    }));
+  }
+
+  function summarizeSpecs(specs) {
+    if (!Array.isArray(specs)) {
+      return [];
+    }
+    return specs.map((spec, index) => ({
+      index,
+      name: spec?.name || null,
+      isHuman: Boolean(spec?.isHuman),
+      isNetworkPlayer: Boolean(spec?.isNetworkPlayer),
+      networkId: spec?.networkId || null,
+      cardBackPattern: spec?.cardBack?.pattern || null
+    }));
+  }
+
+  function summarizePlayers(players) {
+    if (!Array.isArray(players)) {
+      return [];
+    }
+    return players.map((player) => ({
+      id: player?.id,
+      name: player?.name || null,
+      isHuman: Boolean(player?.isHuman),
+      isNetworkPlayer: Boolean(player?.isNetworkPlayer),
+      networkId: player?.networkId || null,
+      cardBackPattern: player?.cardBack?.pattern || null
+    }));
+  }
+
   function init() {
     el.startBtn.addEventListener("click", () => startMatch());
     if (el.newRoundBtn) {
@@ -209,12 +258,19 @@
     const roomCode = (params.get("room") || "").trim().toUpperCase();
     const playerId = (params.get("pid") || "").trim();
     if (!roomCode || !playerId) {
+      logOnline("parseOnlineLaunchParams skipped", {
+        search: window.location.search,
+        roomCode,
+        hasPlayerId: Boolean(playerId)
+      });
       return null;
     }
 
     const playerCount = clamp(Number(params.get("playerCount")) || state.settings.playerCount, 2, 4);
     const difficulty = normalizeDifficulty(params.get("difficulty") || state.settings.difficulty);
-    return { roomCode, playerId, playerCount, difficulty };
+    const launch = { roomCode, playerId, playerCount, difficulty };
+    logOnline("parseOnlineLaunchParams", launch);
+    return launch;
   }
 
   async function maybeAutoLaunchOnlineMatch() {
@@ -222,6 +278,7 @@
     if (!launch) {
       return;
     }
+    logOnline("maybeAutoLaunchOnlineMatch start", launch);
 
     state.online.enabled = true;
     state.online.roomCode = launch.roomCode;
@@ -233,6 +290,10 @@
       difficulty: launch.difficulty
     };
     let playerSpecs = buildFallbackOnlinePlayerSpecs(launch);
+    logOnline("maybeAutoLaunchOnlineMatch fallback specs prepared", {
+      forcedSettings,
+      playerSpecs: summarizeSpecs(playerSpecs)
+    });
 
     const roomData = await tryLoadOnlineRoomData(launch.roomCode);
     if (roomData) {
@@ -245,6 +306,18 @@
       };
       playerSpecs = onlineConfig.playerSpecs;
       state.online.syncReady = true;
+      logOnline("maybeAutoLaunchOnlineMatch room data loaded", {
+        roomCode: launch.roomCode,
+        isHost: state.online.isHost,
+        forcedSettings,
+        playerSpecs: summarizeSpecs(playerSpecs)
+      });
+    } else {
+      logOnline("maybeAutoLaunchOnlineMatch no room data; using fallback bots", {
+        roomCode: launch.roomCode,
+        forcedSettings,
+        playerSpecs: summarizeSpecs(playerSpecs)
+      });
     }
 
     if (el.playerCount) {
@@ -255,16 +328,31 @@
     }
 
     if (!state.running) {
+      logOnline("maybeAutoLaunchOnlineMatch startMatch", {
+        roomCode: launch.roomCode,
+        forcedSettings,
+        playerSpecs: summarizeSpecs(playerSpecs)
+      });
       startMatch({ forcedSettings, playerSpecs });
     }
 
     if (state.online.syncReady) {
+      logOnline("maybeAutoLaunchOnlineMatch setupRealtimeSync", {
+        roomCode: launch.roomCode,
+        isHost: state.online.isHost
+      });
       setupOnlineRealtimeSync();
+    } else {
+      logOnline("maybeAutoLaunchOnlineMatch sync disabled", {
+        reason: "room_data_or_firebase_unavailable",
+        roomCode: launch.roomCode
+      });
     }
   }
 
   async function ensureOnlineFirebase() {
     if (state.online.db && state.online.firebaseDb) {
+      logOnline("ensureOnlineFirebase using cached connection");
       return true;
     }
 
@@ -272,6 +360,10 @@
       const configModule = await import("./firebase-config.js");
       const cfg = configModule?.firebaseConfig || {};
       if (!cfg.apiKey || !cfg.databaseURL) {
+        logOnline("ensureOnlineFirebase missing config", {
+          hasApiKey: Boolean(cfg.apiKey),
+          hasDatabaseUrl: Boolean(cfg.databaseURL)
+        });
         return false;
       }
 
@@ -282,8 +374,10 @@
       const app = existing || firebaseApp.initializeApp(cfg, appName);
       state.online.firebaseDb = firebaseDb;
       state.online.db = firebaseDb.getDatabase(app);
+      logOnline("ensureOnlineFirebase ready", { appName, reusedExistingApp: Boolean(existing) });
       return true;
     } catch (error) {
+      logOnline("ensureOnlineFirebase failed", { error: String(error?.message || error) });
       return false;
     }
   }
@@ -291,13 +385,27 @@
   async function tryLoadOnlineRoomData(roomCode) {
     const ready = await ensureOnlineFirebase();
     if (!ready) {
+      logOnline("tryLoadOnlineRoomData skipped", { roomCode, reason: "firebase_not_ready" });
       return null;
     }
     try {
       const firebaseDb = state.online.firebaseDb;
       const snap = await firebaseDb.get(firebaseDb.ref(state.online.db, `nertz_rooms/${roomCode}`));
-      return snap.exists() ? snap.val() : null;
+      const data = snap.exists() ? snap.val() : null;
+      logOnline("tryLoadOnlineRoomData result", {
+        roomCode,
+        found: Boolean(data),
+        status: data?.status || null,
+        hostId: data?.hostId || null,
+        maxPlayers: data?.maxPlayers || null,
+        playerIds: Object.keys(data?.players || {})
+      });
+      return data;
     } catch (error) {
+      logOnline("tryLoadOnlineRoomData failed", {
+        roomCode,
+        error: String(error?.message || error)
+      });
       return null;
     }
   }
@@ -376,6 +484,13 @@
   function buildOnlinePlayerSpecsFromRoom(roomData, launch) {
     const seatPlan = deriveSeatPlanFromRoom(roomData);
     const difficulty = normalizeDifficulty(roomData?.difficulty || launch.difficulty);
+    logOnline("buildOnlinePlayerSpecsFromRoom seat plan", {
+      roomCode: launch.roomCode,
+      launchPlayerId: launch.playerId,
+      maxPlayers: roomData?.maxPlayers || null,
+      seatPlan: summarizeSeatPlan(seatPlan),
+      botSlots: Object.keys(sanitizeRoomBotSlots(roomData)).map((slot) => Number(slot)).sort((a, b) => a - b)
+    });
     const specs = seatPlan.map((seat) => {
       if (seat.kind === "human") {
         const player = seat.player || {};
@@ -401,7 +516,8 @@
       };
     });
 
-    if (!specs.some((spec) => String(spec.networkId || "") === launch.playerId)) {
+    const localPresent = specs.some((spec) => String(spec.networkId || "") === launch.playerId);
+    if (!localPresent) {
       specs.unshift({
         name: localStorage.getItem("nertz_player_name") || "You",
         isHuman: true,
@@ -422,6 +538,14 @@
         cardBack: botBackForSeat(specs.length + 1)
       });
     }
+
+    logOnline("buildOnlinePlayerSpecsFromRoom result", {
+      roomCode: launch.roomCode,
+      launchPlayerId: launch.playerId,
+      localPresentInSeatPlan: localPresent,
+      finalCount: specs.length,
+      specs: summarizeSpecs(specs.slice(0, 4))
+    });
 
     return {
       playerCount: specs.length,
@@ -451,6 +575,13 @@
         difficulty: launch.difficulty
       });
     }
+
+    logOnline("buildFallbackOnlinePlayerSpecs", {
+      roomCode: launch.roomCode,
+      playerId: launch.playerId,
+      requestedPlayerCount: launch.playerCount,
+      specs: summarizeSpecs(playerSpecs)
+    });
 
     return playerSpecs;
   }
@@ -515,6 +646,7 @@
 
   function hydrateFromOnlineSnapshot(snapshot) {
     if (!snapshot || !Array.isArray(snapshot.players)) {
+      logOnline("hydrateFromOnlineSnapshot skipped invalid payload");
       return;
     }
 
@@ -530,6 +662,14 @@
     state.lastActivityAt = Number(snapshot.lastActivityAt) || Date.now();
     state.lastNertzPlayAt = Number(snapshot.lastNertzPlayAt) || state.lastActivityAt;
     state.rotateProposed = Boolean(snapshot.rotateProposed);
+    logOnline("hydrateFromOnlineSnapshot applied", {
+      rev: state.online.rev,
+      updatedBy: snapshot.updatedBy || null,
+      running: state.running,
+      winnerId: state.winnerId,
+      playerCount: state.players.length,
+      players: summarizePlayers(state.players)
+    });
     state.selected = null;
     state.dealAnimating = false;
     state.awaitingReady = false;
@@ -550,6 +690,12 @@
 
   function publishOnlineSnapshot() {
     if (!state.online.enabled || !state.online.isHost || !state.online.gameRef || !state.online.firebaseDb) {
+      logOnline("publishOnlineSnapshot skipped", {
+        enabled: state.online.enabled,
+        isHost: state.online.isHost,
+        hasGameRef: Boolean(state.online.gameRef),
+        hasFirebaseDb: Boolean(state.online.firebaseDb)
+      });
       return;
     }
     const nextRev = (Number(state.online.rev) || 0) + 1;
@@ -558,21 +704,41 @@
     payload.rev = nextRev;
     payload.updatedBy = state.online.playerId;
     payload.updatedAt = Date.now();
+    logOnline("publishOnlineSnapshot", {
+      roomCode: state.online.roomCode,
+      rev: payload.rev,
+      updatedBy: payload.updatedBy,
+      running: payload.running,
+      winnerId: payload.winnerId,
+      playerCount: Array.isArray(payload.players) ? payload.players.length : 0,
+      players: summarizePlayers(payload.players)
+    });
     state.online.firebaseDb.set(state.online.gameRef, payload).catch(() => {});
   }
 
   function submitOnlineIntent(move) {
     if (!state.online.enabled || state.online.isHost || !state.online.intentsRef || !state.online.firebaseDb) {
+      logOnline("submitOnlineIntent skipped", {
+        enabled: state.online.enabled,
+        isHost: state.online.isHost,
+        hasIntentsRef: Boolean(state.online.intentsRef),
+        hasFirebaseDb: Boolean(state.online.firebaseDb)
+      });
       return false;
     }
 
     const localPlayer = getLocalPlayer();
     if (!localPlayer || !localPlayer.networkId) {
+      logOnline("submitOnlineIntent blocked missing local network player", {
+        playerId: state.online.playerId,
+        localPlayer: localPlayer ? summarizePlayers([localPlayer])[0] : null
+      });
       return false;
     }
 
     const movePayload = cloneJson(move, null);
     if (!movePayload) {
+      logOnline("submitOnlineIntent blocked invalid move payload", { move });
       return false;
     }
     if (movePayload.kind === "toCenter") {
@@ -584,7 +750,18 @@
       move: movePayload,
       createdAt: Date.now()
     };
+    logOnline("submitOnlineIntent", {
+      roomCode: state.online.roomCode,
+      actorId: payload.actorId,
+      moveKind: payload.move?.kind || null,
+      moveSource: payload.move?.source || null
+    });
     state.online.firebaseDb.push(state.online.intentsRef, payload).catch(() => {
+      logOnline("submitOnlineIntent failed push", {
+        roomCode: state.online.roomCode,
+        actorId: payload.actorId,
+        moveKind: payload.move?.kind || null
+      });
       announce("Move failed", "Unable to send move to host.", 1500);
     });
     return true;
@@ -592,21 +769,38 @@
 
   function processOnlineIntent(intentKey, intent) {
     if (!state.online.isHost || !intent || typeof intent !== "object") {
+      logOnline("processOnlineIntent skipped", {
+        isHost: state.online.isHost,
+        hasIntent: Boolean(intent),
+        intentType: typeof intent
+      });
       return;
     }
 
     const actorId = String(intent.actorId || "");
     const move = intent.move || null;
     const actor = state.players.find((player) => String(player.networkId || "") === actorId);
+    logOnline("processOnlineIntent received", {
+      intentKey,
+      actorId,
+      actorName: actor?.name || null,
+      moveKind: move?.kind || null,
+      moveSource: move?.source || null,
+      running: state.running,
+      dealAnimating: state.dealAnimating,
+      awaitingReady: state.awaitingReady
+    });
     let moved = false;
     if (actor && move && !state.dealAnimating && !state.awaitingReady && state.running) {
       moved = applyMove(actor, move, false);
       if (moved) {
+        logOnline("processOnlineIntent applied", { intentKey, actorId, moveKind: move?.kind || null });
         publishOnlineSnapshot();
       }
     }
 
     if (!moved && intent?.move?.kind) {
+      logOnline("processOnlineIntent invalid", { intentKey, actorId, moveKind: intent?.move?.kind || null });
       addLog(`<strong>${actor?.name || "Player"}</strong> attempted an invalid move.`);
     }
 
@@ -619,6 +813,12 @@
 
   function setupOnlineRealtimeSync() {
     if (!state.online.enabled || !state.online.firebaseDb || !state.online.db || !state.online.roomCode) {
+      logOnline("setupOnlineRealtimeSync skipped", {
+        enabled: state.online.enabled,
+        hasFirebaseDb: Boolean(state.online.firebaseDb),
+        hasDb: Boolean(state.online.db),
+        roomCode: state.online.roomCode
+      });
       return;
     }
 
@@ -634,26 +834,47 @@
     const firebaseDb = state.online.firebaseDb;
     state.online.gameRef = firebaseDb.ref(state.online.db, `nertz_rooms/${state.online.roomCode}/game`);
     state.online.intentsRef = firebaseDb.ref(state.online.db, `nertz_rooms/${state.online.roomCode}/intents`);
+    logOnline("setupOnlineRealtimeSync ready", {
+      roomCode: state.online.roomCode,
+      role: state.online.isHost ? "host" : "client",
+      playerId: state.online.playerId
+    });
 
     state.online.unsubGame = firebaseDb.onValue(state.online.gameRef, (snapshot) => {
       if (!snapshot.exists()) {
+        logOnline("setupOnlineRealtimeSync game snapshot missing", { roomCode: state.online.roomCode });
         return;
       }
       const payload = snapshot.val();
       if (!payload || !Array.isArray(payload.players)) {
+        logOnline("setupOnlineRealtimeSync game snapshot invalid", { roomCode: state.online.roomCode });
         return;
       }
+      logOnline("setupOnlineRealtimeSync game snapshot", {
+        roomCode: state.online.roomCode,
+        rev: payload.rev ?? null,
+        updatedBy: payload.updatedBy || null,
+        playerCount: Array.isArray(payload.players) ? payload.players.length : 0
+      });
       if (
         state.online.isHost &&
         payload.updatedBy === state.online.playerId &&
         Number(payload.rev) === Number(state.online.rev)
       ) {
+        logOnline("setupOnlineRealtimeSync game snapshot ignored self echo", {
+          roomCode: state.online.roomCode,
+          rev: payload.rev ?? null
+        });
         return;
       }
       hydrateFromOnlineSnapshot(payload);
     });
 
     state.online.snapshotReady = state.online.isHost;
+    logOnline("setupOnlineRealtimeSync snapshotReady", {
+      roomCode: state.online.roomCode,
+      snapshotReady: state.online.snapshotReady
+    });
 
     if (state.online.isHost) {
       state.online.unsubIntents = firebaseDb.onValue(state.online.intentsRef, (snapshot) => {
@@ -663,6 +884,10 @@
           const right = Number(b[1]?.createdAt) || 0;
           if (left !== right) return left - right;
           return String(a[0]).localeCompare(String(b[0]));
+        });
+        logOnline("setupOnlineRealtimeSync intents snapshot", {
+          roomCode: state.online.roomCode,
+          intentCount: ordered.length
         });
         for (const [intentKey, intent] of ordered) {
           processOnlineIntent(intentKey, intent);
@@ -688,6 +913,12 @@
     clearSelectionGhost();
     clearFlyingGhosts();
     const forcedSettings = options.forcedSettings || null;
+    logOnline("startMatch invoked", {
+      onlineEnabled: state.online.enabled,
+      roomCode: state.online.roomCode || null,
+      forcedSettings,
+      providedSpecs: summarizeSpecs(options.playerSpecs || [])
+    });
     if (forcedSettings) {
       state.settings.playerCount = clamp(Number(forcedSettings.playerCount) || state.settings.playerCount, 2, 4);
       state.settings.difficulty = normalizeDifficulty(forcedSettings.difficulty || state.settings.difficulty);
@@ -700,6 +931,14 @@
     if (state.online.enabled) {
       state.players = state.players.map((player) => normalizeOnlinePlayerFlags(player));
     }
+    logOnline("startMatch players ready", {
+      playerCount: state.players.length,
+      settings: {
+        playerCount: state.settings.playerCount,
+        difficulty: state.settings.difficulty
+      },
+      players: summarizePlayers(state.players)
+    });
     state.centerPiles = [];
     state.centerPileSlots = [];
     state.completedCenterSlots = new Set();
@@ -809,6 +1048,14 @@
         nextActionAt: performance.now() + randomInt(160, 720)
       });
     }
+
+    logOnline("createPlayers", {
+      requestedCount: playerCount,
+      difficulty,
+      usedSpecs: Boolean(specs),
+      finalCount: players.length,
+      players: summarizePlayers(players)
+    });
 
     return players;
   }
