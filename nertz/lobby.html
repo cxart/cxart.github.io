@@ -3,12 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Nertz Online</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='white'/%3E%3Ctext x='18' y='35' font-size='30' font-family='Arial' font-weight='700'%3EA%3C/text%3E%3Ctext x='30' y='82' font-size='56' font-family='Arial'%3E%E2%99%A0%3C/text%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Sora:wght@300;400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" id="nertz-stylesheet" />
+    <script>
+      (() => {
+        const bust = String(Date.now());
+        window.__NERTZ_ASSET_BUST = bust;
+        const styleEl = document.getElementById("nertz-stylesheet");
+        if (styleEl) {
+          styleEl.href = `styles.css?v=${encodeURIComponent(bust)}`;
+        }
+      })();
+    </script>
     <style>
       .lobby-shell {
         max-width: 600px;
@@ -500,6 +513,9 @@
 
     </main>
 
-    <script type="module" src="lobby.js"></script>
+    <script type="module">
+      const bust = window.__NERTZ_ASSET_BUST || String(Date.now());
+      await import(`./lobby.js?v=${encodeURIComponent(bust)}`);
+    </script>
   </body>
 </html>

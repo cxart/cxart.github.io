@@ -725,18 +725,41 @@
     return state.players.find((player) => player.isHuman) || state.players[0] || null;
   }
 
+  function ensurePlayerRuntimeState(player) {
+    if (!player || typeof player !== "object") {
+      return player;
+    }
+    if (!Array.isArray(player.handSlots)) {
+      player.handSlots = [];
+    }
+    if (!Array.isArray(player.currentChunk)) {
+      player.currentChunk = [];
+    }
+    if (!Array.isArray(player.wasteHistory)) {
+      player.wasteHistory = [];
+    }
+    if (!Array.isArray(player.tableau)) {
+      player.tableau = [[], [], [], []];
+    }
+    if (!Array.isArray(player.nertz)) {
+      player.nertz = [];
+    }
+    return player;
+  }
+
   function normalizeOnlinePlayerFlags(player, fallbackCardBack = null) {
     const networkId = player?.networkId ? String(player.networkId) : null;
     const isLocal = Boolean(state.online.enabled && networkId && networkId === state.online.playerId);
     const localFallback = state.settings.cardBackConfig;
     const nonLocalFallback = sanitizeCardBack(fallbackCardBack, null) || botBackForSeat(Number(player?.id) || 0);
-    return {
+    const normalized = {
       ...player,
       networkId,
       isHuman: isLocal,
       isNetworkPlayer: Boolean(networkId && !isLocal),
       cardBack: sanitizeCardBack(player?.cardBack, isLocal ? localFallback : nonLocalFallback)
     };
+    return ensurePlayerRuntimeState(normalized);
   }
 
   function cloneJson(value, fallback) {
@@ -2296,6 +2319,7 @@
   }
 
   function cleanCurrentChunk(player) {
+    ensurePlayerRuntimeState(player);
     while (player.currentChunk.length) {
       const idx = player.currentChunk[player.currentChunk.length - 1];
       if (player.handSlots[idx]) {
@@ -3709,6 +3733,7 @@
   }
 
   function getWasteCardsForRender(player) {
+    ensurePlayerRuntimeState(player);
     cleanCurrentChunk(player);
     const top = getWasteTop(player);
     const cards = [];
