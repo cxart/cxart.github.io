@@ -739,11 +739,20 @@
     if (!Array.isArray(player.wasteHistory)) {
       player.wasteHistory = [];
     }
-    if (!Array.isArray(player.tableau)) {
-      player.tableau = [[], [], [], []];
-    }
+    const rawTableau = Array.isArray(player.tableau) ? player.tableau : [];
+    player.tableau = Array.from({ length: 4 }, (_, idx) => {
+      const pile = rawTableau[idx];
+      return Array.isArray(pile) ? pile : [];
+    });
     if (!Array.isArray(player.nertz)) {
       player.nertz = [];
+    }
+    if (!player.dealVisible || typeof player.dealVisible !== "object") {
+      player.dealVisible = { pileCounts: [0, 0, 0, 0], nertzVisual: 0 };
+    } else {
+      const rawCounts = Array.isArray(player.dealVisible.pileCounts) ? player.dealVisible.pileCounts : [];
+      player.dealVisible.pileCounts = Array.from({ length: 4 }, (_, idx) => Number(rawCounts[idx]) || 0);
+      player.dealVisible.nertzVisual = Number(player.dealVisible.nertzVisual) || 0;
     }
     return player;
   }
