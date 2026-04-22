@@ -27,6 +27,11 @@
   const CENTER_SLOT_COLUMNS = 10;
   const BOT_STACK_BREAKPOINT = 900;
   const MP_DEBUG_PREFIX = "[NERTZ-MP-DEBUG][game]";
+  const SETUP_PATTERNS = {
+    "1-2-3-4": [1, 2, 3, 4],
+    "2-2-2-2": [2, 2, 2, 2],
+    "1-1-1-1": [1, 1, 1, 1]
+  };
 
   const DIFFICULTY = {
     easy: { minDelay: 1300, maxDelay: 2300, skill: 0.34, idleChance: 0.34 },
@@ -52,6 +57,7 @@
     settings: {
       playerCount: 3,
       difficulty: "medium",
+      setupPattern: null,
       cardBack: "weave",
       cardBackConfig: { pattern: "weave", color1: "#7a1621", color2: "#b03641" }
     },
@@ -161,6 +167,7 @@
       isHuman: Boolean(spec?.isHuman),
       isNetworkPlayer: Boolean(spec?.isNetworkPlayer),
       networkId: spec?.networkId || null,
+      handicap: normalizeHandicap(spec?.handicap),
       cardBackPattern: spec?.cardBack?.pattern || null
     }));
   }
@@ -175,6 +182,8 @@
       isHuman: Boolean(player?.isHuman),
       isNetworkPlayer: Boolean(player?.isNetworkPlayer),
       networkId: player?.networkId || null,
+      handicap: normalizeHandicap(player?.handicap),
+      startingNertz: Number(player?.startingNertz) || (13 + normalizeHandicap(player?.handicap)),
       cardBackPattern: player?.cardBack?.pattern || null
     }));
   }
@@ -272,8 +281,9 @@
 
     const playerCount = clamp(Number(params.get("playerCount")) || state.settings.playerCount, 2, 4);
     const difficulty = normalizeDifficulty(params.get("difficulty") || state.settings.difficulty);
+    const setupPattern = normalizeSetupPattern(params.get("setup"), null);
     const hostHint = params.get("host") === "1";
-    const launch = { roomCode, playerId, playerCount, difficulty, hostHint };
+    const launch = { roomCode, playerId, playerCount, difficulty, setupPattern, hostHint };
     logOnline("parseOnlineLaunchParams", launch);
     return launch;
   }
@@ -293,7 +303,8 @@
 
     let forcedSettings = {
       playerCount: launch.playerCount,
-      difficulty: launch.difficulty
+      difficulty: launch.difficulty,
+      setupPattern: launch.setupPattern
     };
     let playerSpecs = buildFallbackOnlinePlayerSpecs(launch);
     logOnline("maybeAutoLaunchOnlineMatch fallback specs prepared", {
@@ -309,7 +320,8 @@
       const onlineConfig = buildOnlinePlayerSpecsFromRoom(roomData, launch);
       forcedSettings = {
         playerCount: onlineConfig.playerCount,
-        difficulty: onlineConfig.difficulty
+        difficulty: onlineConfig.difficulty,
+        setupPattern: onlineConfig.setupPattern
       };
       playerSpecs = onlineConfig.playerSpecs;
       state.online.syncReady = true;
@@ -516,6 +528,7 @@
         status: data?.status || null,
         hostId: data?.hostId || null,
         maxPlayers: data?.maxPlayers || null,
+        setupPattern: data?.setupPattern || null,
         playerIds: Object.keys(data?.players || {})
       });
       return data;
@@ -602,9 +615,11 @@
   function buildOnlinePlayerSpecsFromRoom(roomData, launch) {
     const seatPlan = deriveSeatPlanFromRoom(roomData);
     const difficulty = normalizeDifficulty(roomData?.difficulty || launch.difficulty);
+    const setupPattern = normalizeSetupPattern(roomData?.setupPattern, launch.setupPattern);
     logOnline("buildOnlinePlayerSpecsFromRoom seat plan", {
       roomCode: launch.roomCode,
       launchPlayerId: launch.playerId,
+      setupPattern,
       maxPlayers: roomData?.maxPlayers || null,
       seatPlan: summarizeSeatPlan(seatPlan),
       botSlots: Object.keys(sanitizeRoomBotSlots(roomData)).map((slot) => Number(slot)).sort((a, b) => a - b)
@@ -620,6 +635,7 @@
           isNetworkPlayer: !isLocal,
           networkId: networkId || null,
           difficulty,
+          handicap: normalizeHandicap(player?.handicap),
           cardBack: sanitizeCardBack(player?.cardBack, isLocal ? state.settings.cardBackConfig : null)
         };
       }
@@ -630,6 +646,7 @@
         isNetworkPlayer: false,
         networkId: null,
         difficulty,
+        handicap: 0,
         cardBack: botBackForSeat(seat.slot)
       };
     });
@@ -642,6 +659,7 @@
         isNetworkPlayer: false,
         networkId: launch.playerId,
         difficulty,
+        handicap: 0,
         cardBack: state.settings.cardBackConfig
       });
     }
@@ -653,6 +671,7 @@
         isNetworkPlayer: false,
         networkId: null,
         difficulty,
+        handicap: 0,
         cardBack: botBackForSeat(specs.length + 1)
       });
     }
@@ -660,6 +679,7 @@
     logOnline("buildOnlinePlayerSpecsFromRoom result", {
       roomCode: launch.roomCode,
       launchPlayerId: launch.playerId,
+      setupPattern,
       localPresentInSeatPlan: localPresent,
       finalCount: specs.length,
       specs: summarizeSpecs(specs.slice(0, 4))
@@ -668,6 +688,7 @@
     return {
       playerCount: specs.length,
       difficulty,
+      setupPattern,
       playerSpecs: specs.slice(0, 4)
     };
   }
@@ -680,6 +701,7 @@
         isNetworkPlayer: false,
         networkId: launch.playerId,
         difficulty: launch.difficulty,
+        handicap: 0,
         cardBack: state.settings.cardBackConfig
       }
     ];
@@ -690,7 +712,8 @@
         isHuman: false,
         isNetworkPlayer: false,
         networkId: null,
-        difficulty: launch.difficulty
+        difficulty: launch.difficulty,
+        handicap: 0
       });
     }
 
@@ -754,6 +777,8 @@
       player.dealVisible.pileCounts = Array.from({ length: 4 }, (_, idx) => Number(rawCounts[idx]) || 0);
       player.dealVisible.nertzVisual = Number(player.dealVisible.nertzVisual) || 0;
     }
+    player.handicap = normalizeHandicap(player.handicap);
+    player.startingNertz = clamp(Number(player.startingNertz) || (13 + player.handicap), 1, 52);
     return player;
   }
 
@@ -762,11 +787,14 @@
     const isLocal = Boolean(state.online.enabled && networkId && networkId === state.online.playerId);
     const localFallback = state.settings.cardBackConfig;
     const nonLocalFallback = sanitizeCardBack(fallbackCardBack, null) || botBackForSeat(Number(player?.id) || 0);
+    const handicap = normalizeHandicap(player?.handicap);
     const normalized = {
       ...player,
       networkId,
       isHuman: isLocal,
       isNetworkPlayer: Boolean(networkId && !isLocal),
+      handicap,
+      startingNertz: clamp(Number(player?.startingNertz) || (13 + handicap), 1, 52),
       cardBack: sanitizeCardBack(player?.cardBack, isLocal ? localFallback : nonLocalFallback)
     };
     return ensurePlayerRuntimeState(normalized);
@@ -1149,12 +1177,21 @@
     if (forcedSettings) {
       state.settings.playerCount = clamp(Number(forcedSettings.playerCount) || state.settings.playerCount, 2, 4);
       state.settings.difficulty = normalizeDifficulty(forcedSettings.difficulty || state.settings.difficulty);
+      state.settings.setupPattern = normalizeSetupPattern(forcedSettings.setupPattern, null);
     } else {
       state.settings.playerCount = Number(el.playerCount.value);
       state.settings.difficulty = el.difficulty.value;
+      if (!state.online.enabled) {
+        state.settings.setupPattern = null;
+      }
     }
 
-    state.players = createPlayers(state.settings.playerCount, state.settings.difficulty, options.playerSpecs || null);
+    state.players = createPlayers(
+      state.settings.playerCount,
+      state.settings.difficulty,
+      options.playerSpecs || null,
+      state.settings.setupPattern
+    );
     if (state.online.enabled) {
       state.players = state.players.map((player) => normalizeOnlinePlayerFlags(player));
     }
@@ -1162,7 +1199,8 @@
       playerCount: state.players.length,
       settings: {
         playerCount: state.settings.playerCount,
-        difficulty: state.settings.difficulty
+        difficulty: state.settings.difficulty,
+        setupPattern: state.settings.setupPattern
       },
       players: summarizePlayers(state.players)
     });
@@ -1219,24 +1257,31 @@
     runInitialDealAnimation(state.dealToken);
   }
 
-  function tableauDealPattern(playerTotal) {
+  function tableauDealPattern(playerTotal, setupPattern = null) {
+    const explicitPattern = normalizeSetupPattern(setupPattern, null);
+    if (explicitPattern && SETUP_PATTERNS[explicitPattern]) {
+      return SETUP_PATTERNS[explicitPattern].slice();
+    }
     if (Number(playerTotal) === 2) {
       return [2, 2, 2, 2];
     }
     return [1, 2, 3, 4];
   }
 
-  function createPlayers(playerCount, difficulty, playerSpecs = null) {
+  function createPlayers(playerCount, difficulty, playerSpecs = null, setupPattern = null) {
     const players = [];
     const specs = Array.isArray(playerSpecs) && playerSpecs.length ? playerSpecs.slice(0, 4) : null;
     const count = specs ? specs.length : playerCount;
-    const dealPattern = tableauDealPattern(count);
+    const normalizedSetupPattern = normalizeSetupPattern(setupPattern, null);
+    const dealPattern = tableauDealPattern(count, normalizedSetupPattern);
     const botBacks = generateBotBacks(Math.max(0, count - 1), state.settings.cardBackConfig);
     let nextBotBack = 0;
 
     for (let i = 0; i < count; i += 1) {
       const spec = specs ? specs[i] : null;
       const isHuman = spec ? Boolean(spec.isHuman) : i === 0;
+      const handicap = normalizeHandicap(spec?.handicap);
+      const startingNertz = clamp(13 + handicap, 1, 52);
       const deck = shuffled(makeDeck(i + 1));
 
       let cursor = 0;
@@ -1252,8 +1297,8 @@
         tableau.push(cards);
       }
 
-      const nertz = deck.slice(cursor, cursor + 13);
-      cursor += 13;
+      const nertz = deck.slice(cursor, cursor + startingNertz);
+      cursor += startingNertz;
       nertz.forEach((card, idx) => {
         card.faceUp = idx === nertz.length - 1;
       });
@@ -1270,6 +1315,8 @@
         isNetworkPlayer: Boolean(spec?.isNetworkPlayer),
         networkId: spec?.networkId || null,
         difficulty: normalizeDifficulty(spec?.difficulty || difficulty),
+        handicap,
+        startingNertz,
         cardBack: spec?.cardBack || (isHuman ? state.settings.cardBackConfig : botBacks[nextBotBack++] || state.settings.cardBackConfig),
         tableau,
         nertz,
@@ -1289,6 +1336,7 @@
     logOnline("createPlayers", {
       requestedCount: playerCount,
       difficulty,
+      setupPattern: normalizedSetupPattern,
       usedSpecs: Boolean(specs),
       finalCount: players.length,
       players: summarizePlayers(players)
@@ -3457,7 +3505,10 @@
       }
 
       const totalNertz = state.players.reduce((s, p) => s + p.nertz.length, 0);
-      const initialNertz = 13 * state.players.length;
+      const initialNertz = state.players.reduce(
+        (sum, player) => sum + (Number(player?.startingNertz) || (13 + normalizeHandicap(player?.handicap))),
+        0
+      );
       const fraction = initialNertz > 0 ? totalNertz / initialNertz : 1;
       const threshold = Math.round(15000 + fraction * (75000 - 15000));
       const lastAct = state.lastActivityAt ?? state.lastNertzPlayAt;
@@ -3540,12 +3591,20 @@
         const botBack = cardBackStyle(bot.cardBack);
         const visibleNertz = getVisibleNertzVisual(bot);
 
-        const stockHtml = handLeft > 0
+        const botToFlip = (() => {
+          let count = 0;
+          const slots = bot.handSlots;
+          const cursor = bot.drawCursor;
+          for (let i = cursor; i < slots.length; i++) {
+            if (slots[i]) count++;
+          }
+          return count;
+        })();
+        const botStockLayers = (botToFlip === 0 || bot.deckWrapped) ? 0 : botToFlip <= 4 ? 1 : botToFlip <= 10 ? 2 : 3;
+        const stockHtml = botStockLayers > 0
           ? `
               <div class="bot-stock-stack">
-                ${renderCard({ faceUp: false }, { faceUp: false, small: true, backStyle: botBack })}
-                ${renderCard({ faceUp: false }, { faceUp: false, small: true, backStyle: botBack })}
-                ${renderCard({ faceUp: false }, { faceUp: false, small: true, backStyle: botBack })}
+                ${Array.from({ length: botStockLayers }, () => renderCard({ faceUp: false }, { faceUp: false, small: true, backStyle: botBack })).join("")}
               </div>
             `
           : '<div class="ghost-slot small"></div>';
@@ -3704,8 +3763,16 @@
           .join("")
       : '<div class="ghost-slot"></div>';
 
-    const remainingHand = remainingHandCount(human);
-    const stockLayers = remainingHand === 0 ? 0 : remainingHand <= 4 ? 1 : remainingHand <= 10 ? 2 : remainingHand <= 20 ? 3 : 4;
+    const toFlip = (() => {
+      let count = 0;
+      const slots = human.handSlots;
+      const cursor = human.drawCursor;
+      for (let i = cursor; i < slots.length; i++) {
+        if (slots[i]) count++;
+      }
+      return count;
+    })();
+    const stockLayers = (toFlip === 0 || human.deckWrapped) ? 0 : toFlip <= 4 ? 1 : toFlip <= 10 ? 2 : toFlip <= 20 ? 3 : 4;
     const stockCards = stockLayers > 0
       ? Array.from({ length: stockLayers }, () => `<div class="card face-down"></div>`).join("")
       : '<div class="ghost-slot"></div>';
@@ -3934,6 +4001,20 @@
       return value;
     }
     return "medium";
+  }
+
+  function normalizeSetupPattern(value, fallback = "1-2-3-4") {
+    const key = String(value || "").trim();
+    if (SETUP_PATTERNS[key]) {
+      return key;
+    }
+    return fallback;
+  }
+
+  function normalizeHandicap(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return clamp(Math.trunc(n), -6, 6);
   }
 
   function capitalize(text) {

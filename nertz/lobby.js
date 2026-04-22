@@ -62,6 +62,7 @@ const CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L
 const MIN_ROOM_PLAYERS = 2;
 const MAX_ROOM_PLAYERS = 4;
 const MP_DEBUG_PREFIX = "[NERTZ-MP-DEBUG][lobby]";
+const SETUP_PATTERNS = new Set(["1-2-3-4", "2-2-2-2", "1-1-1-1"]);
 
 function randomCode() {
   return Array.from({ length: 4 }, () =>
@@ -73,6 +74,25 @@ function clampRoomSize(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return MAX_ROOM_PLAYERS;
   return Math.max(MIN_ROOM_PLAYERS, Math.min(MAX_ROOM_PLAYERS, Math.floor(n)));
+}
+
+function normalizeSetupPattern(value) {
+  const pattern = String(value || "").trim();
+  if (SETUP_PATTERNS.has(pattern)) {
+    return pattern;
+  }
+  return "1-2-3-4";
+}
+
+function normalizeHandicap(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(-6, Math.min(6, Math.trunc(n)));
+}
+
+function formatHandicap(value) {
+  const n = normalizeHandicap(value);
+  return n > 0 ? `+${n}` : String(n);
 }
 
 function logLobby(event, details) {
@@ -93,12 +113,14 @@ function summarizeRoom(room) {
     status: source.status || null,
     hostId: source.hostId || null,
     maxPlayers,
+    setupPattern: normalizeSetupPattern(source.setupPattern),
     difficulty: source.difficulty || null,
     seatedPlayers: seatedPlayers.map((player) => ({
       id: player.id,
       name: player.name,
       seat: player.seat,
-      ready: Boolean(player.ready)
+      ready: Boolean(player.ready),
+      handicap: normalizeHandicap(player.handicap)
     })),
     botSlots: Object.keys(botSlots).map((slot) => Number(slot)).sort((a, b) => a - b)
   };
@@ -139,6 +161,7 @@ const el = {
   hostSettings: document.getElementById("host-settings"),
   maxPlayersSelect: document.getElementById("max-players-select"),
   botDifficultySelect: document.getElementById("bot-difficulty-select"),
+  setupPatternSelect: document.getElementById("setup-pattern-select"),
   readyBtn: document.getElementById("ready-btn"),
   startGameBtn: document.getElementById("start-game-btn"),
   leaveRoomBtn: document.getElementById("leave-room-btn")
@@ -231,11 +254,20 @@ async function createRoom() {
     hostId: MY_ID,
     status: "waiting",
     maxPlayers,
+    setupPattern: "1-2-3-4",
     difficulty: "medium",
     botSlots: {},
     createdAt: Date.now(),
     players: {
-      [MY_ID]: { id: MY_ID, seat: 0, name, ready: false, joinedAt: Date.now(), cardBack: getCardBack() }
+      [MY_ID]: {
+        id: MY_ID,
+        seat: 0,
+        name,
+        ready: false,
+        joinedAt: Date.now(),
+        cardBack: getCardBack(),
+        handicap: 0
+      }
     }
   };
 
@@ -287,7 +319,13 @@ async function joinRoom(code) {
   }
 
   await update(ref(db, `nertz_rooms/${code}/players/${MY_ID}`), {
-    id: MY_ID, seat, name, ready: false, joinedAt: Date.now(), cardBack: getCardBack()
+    id: MY_ID,
+    seat,
+    name,
+    ready: false,
+    joinedAt: Date.now(),
+    cardBack: getCardBack(),
+    handicap: 0
   });
   logLobby("joinRoom success", { code, playerId: MY_ID, seat, name });
 
@@ -379,6 +417,16 @@ function countActiveBotSlots(room, seatedPlayers) {
   return count;
 }
 
+function renderHandicapOptions(selectedValue) {
+  const selected = normalizeHandicap(selectedValue);
+  const options = [];
+  for (let value = -6; value <= 6; value += 1) {
+    const label = value > 0 ? `+${value}` : String(value);
+    options.push(`<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`);
+  }
+  return options.join("");
+}
+
 async function cancelDisconnectCleanup(code, includeRoomCleanup = false) {
   if (!db || !code) return;
   const tasks = [
@@ -451,6 +499,9 @@ function renderWaitingRoom(data) {
   if (state.isHost) {
     el.maxPlayersSelect.value = String(maxPlayers);
     el.botDifficultySelect.value = data.difficulty || "medium";
+    if (el.setupPatternSelect) {
+      el.setupPatternSelect.value = normalizeSetupPattern(data.setupPattern);
+    }
   }
 
   // Player slots (filled + bot + empty)
@@ -458,12 +509,24 @@ function renderWaitingRoom(data) {
   for (let i = 0; i < maxPlayers; i++) {
     const p = playersBySeat.get(i);
     if (p) {
+      const handicap = normalizeHandicap(p.handicap);
+      const playerIdAttr = escapeHtml(String(p.id || ""));
+      const handicapControl = state.isHost
+        ? `<label class="slot-handicap-wrap">Handicap
+            <select
+              class="slot-handicap-select"
+              data-slot-action="set-handicap"
+              data-player-id="${playerIdAttr}"
+            >${renderHandicapOptions(handicap)}</select>
+          </label>`
+        : `<span class="slot-handicap-wrap">Handicap <span class="slot-handicap-value">${formatHandicap(handicap)}</span></span>`;
       slots.push(`
         <div class="player-slot">
           <span class="slot-dot"></span>
           <span class="slot-name">${escapeHtml(p.name)}${p.id === MY_ID ? " (you)" : ""}</span>
           ${p.id === data.hostId ? `<span class="slot-badge host">Host</span>` : ""}
           ${p.ready ? `<span class="slot-ready-icon">✓</span>` : `<span class="slot-badge">Not ready</span>`}
+          ${handicapControl}
         </div>`);
       continue;
     }
@@ -510,6 +573,7 @@ function renderWaitingRoom(data) {
     })),
     botSlots: Object.keys(botSlots).map((slot) => Number(slot)).sort((a, b) => a - b),
     maxPlayers,
+    setupPattern: normalizeSetupPattern(data.setupPattern),
     activeBotCount,
     activeSeatCount,
     allHumansReady,
@@ -538,6 +602,10 @@ async function updateRoomSettings() {
     el.maxPlayersSelect.value = String(maxPlayers);
   }
   const difficulty = el.botDifficultySelect.value;
+  const setupPattern = normalizeSetupPattern(el.setupPatternSelect?.value);
+  if (el.setupPatternSelect) {
+    el.setupPatternSelect.value = setupPattern;
+  }
   const occupiedSeats = new Set(seatedPlayers.map((player) => player.seat));
   const currentBotSlots = getSanitizedBotSlots(state.roomData || {});
   const botSlots = {};
@@ -553,10 +621,11 @@ async function updateRoomSettings() {
     requestedMaxPlayers: requestedMaxPlayers,
     appliedMaxPlayers: maxPlayers,
     difficulty,
+    setupPattern,
     occupiedSeats: Array.from(occupiedSeats).sort((a, b) => a - b),
     botSlots: Object.keys(botSlots).map((slot) => Number(slot)).sort((a, b) => a - b)
   });
-  await update(ref(db, `nertz_rooms/${state.roomCode}`), { maxPlayers, difficulty, botSlots });
+  await update(ref(db, `nertz_rooms/${state.roomCode}`), { maxPlayers, difficulty, setupPattern, botSlots });
 }
 
 async function toggleBotSlot(slot) {
@@ -590,15 +659,38 @@ async function toggleBotSlot(slot) {
   await update(ref(db, `nertz_rooms/${state.roomCode}`), { botSlots });
 }
 
+async function updatePlayerHandicap(playerId, value) {
+  if (!db || !state.roomCode || !state.isHost || !playerId) return;
+  const seatedPlayers = normalizeRoomPlayers(state.roomData || {});
+  const player = seatedPlayers.find((entry) => String(entry.id) === String(playerId));
+  if (!player) return;
+  const handicap = normalizeHandicap(value);
+  logLobby("updatePlayerHandicap", {
+    roomCode: state.roomCode,
+    targetPlayerId: player.id,
+    targetSeat: player.seat,
+    handicap
+  });
+  await update(ref(db, `nertz_rooms/${state.roomCode}/players/${player.id}`), { handicap });
+}
+
 async function onPlayerSlotAction(event) {
-  const actionBtn = event.target.closest("[data-slot-action]");
-  if (!actionBtn || !state.isHost) return;
-  const action = actionBtn.dataset.slotAction;
+  const actionTarget = event.target.closest("[data-slot-action]");
+  if (!actionTarget || !state.isHost) return;
+  const action = actionTarget.dataset.slotAction;
   if (action === "toggle-bot") {
-    const slot = Number(actionBtn.dataset.slot);
+    if (event.type !== "click") return;
+    const slot = Number(actionTarget.dataset.slot);
     if (Number.isInteger(slot)) {
       await toggleBotSlot(slot);
     }
+    return;
+  }
+  if (action === "set-handicap") {
+    if (event.type !== "change") return;
+    const playerId = String(actionTarget.dataset.playerId || "").trim();
+    if (!playerId) return;
+    await updatePlayerHandicap(playerId, actionTarget.value);
   }
 }
 
@@ -606,6 +698,7 @@ async function onPlayerSlotAction(event) {
 
 async function startGame() {
   if (!db || !state.roomCode || !state.isHost) return;
+  await updateRoomSettings();
   const data = state.roomData || {};
   const seatedPlayers = normalizeRoomPlayers(data);
   const activeSeatCount = seatedPlayers.length + countActiveBotSlots(data, seatedPlayers);
@@ -643,7 +736,8 @@ async function navigateToGame(roomData) {
     pid: MY_ID,
     host: state.isHost ? "1" : "0",
     difficulty: roomData.difficulty || "medium",
-    playerCount: String(playerCount)
+    playerCount: String(playerCount),
+    setup: normalizeSetupPattern(roomData.setupPattern)
   });
   logLobby("navigateToGame", {
     room: summarizeRoom(roomData),
@@ -734,8 +828,12 @@ function init() {
   el.startGameBtn.addEventListener("click", startGame);
   el.leaveRoomBtn.addEventListener("click", () => leaveRoom(true));
   el.playerSlots.addEventListener("click", onPlayerSlotAction);
+  el.playerSlots.addEventListener("change", onPlayerSlotAction);
   el.maxPlayersSelect.addEventListener("change", updateRoomSettings);
   el.botDifficultySelect.addEventListener("change", updateRoomSettings);
+  if (el.setupPatternSelect) {
+    el.setupPatternSelect.addEventListener("change", updateRoomSettings);
+  }
 
   // Start watching rooms if Firebase is ready
   if (db) watchRooms();
