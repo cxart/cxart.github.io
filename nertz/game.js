@@ -24,6 +24,7 @@
   const WASTE_SPREAD_STEP = 14;
   const BASE_CENTER_SLOT_COUNT = 10;
   const CENTER_SLOT_COLUMNS = 10;
+  const BOT_STACK_BREAKPOINT = 900;
 
   const DIFFICULTY = {
     easy: { minDelay: 1300, maxDelay: 2300, skill: 0.34, idleChance: 0.34 },
@@ -43,6 +44,7 @@
   ];
 
   let cardUid = 0;
+  let resizeRafHandle = null;
 
   const state = {
     settings: {
@@ -143,14 +145,7 @@
 
     if (el.forceReshuffleBtn) {
       el.forceReshuffleBtn.addEventListener("click", () => {
-        for (const player of state.players) reshuffleDrawPile(player);
-        state.lastNertzPlayAt = Date.now();
-        state.lastActivityAt = Date.now();
-        state.lastReshuffle = Date.now();
-        el.forceReshuffleBtn.style.display = "none";
-        announce("Draw piles reshuffled!", "Keep playing.", 2500);
-        addLog("<strong>Manual reshuffle.</strong> Draw piles reshuffled.");
-        render();
+        executeRotate();
       });
     }
 
@@ -158,8 +153,19 @@
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onGlobalKeyDown);
     document.addEventListener("mousemove", onMouseMovePassive);
+    window.addEventListener("resize", onViewportResize, { passive: true });
     render();
     void maybeAutoLaunchOnlineMatch();
+  }
+
+  function onViewportResize() {
+    if (resizeRafHandle !== null) {
+      return;
+    }
+    resizeRafHandle = window.requestAnimationFrame(() => {
+      resizeRafHandle = null;
+      render();
+    });
   }
 
   function loadCardBack() {
@@ -397,6 +403,7 @@
     state.lastReshuffle = 0;
     state.lastNertzPlayAt = Date.now();
     state.lastActivityAt = Date.now();
+    state.rotateProposed = false;
     state.dealAnimating = true;
     state.dealToken += 1;
     state.awaitingReady = false;
@@ -514,44 +521,54 @@
   }
 
   function hasAnyProgressMove(player) {
+    // 1. Nertz card can go to center OR stack onto an existing (non-empty) tableau pile
     const nertzTop = topNertzCard(player);
     if (nertzTop) {
       if (findCenterTarget(nertzTop) !== null) return true;
       for (const pile of player.tableau) {
-        if (pile.length === 0) return true;
-        if (canStackOnTableau(nertzTop, pile[pile.length - 1])) return true;
+        if (pile.length > 0 && canStackOnTableau(nertzTop, pile[pile.length - 1])) return true;
       }
     }
 
-    const wasteTop = getWasteTop(player);
-    if (wasteTop) {
-      if (findCenterTarget(wasteTop.card) !== null) return true;
-      for (const pile of player.tableau) {
-        if (pile.length === 0) return true;
-        if (canStackOnTableau(wasteTop.card, pile[pile.length - 1])) return true;
-      }
-    }
-
+    // 2. Top card of any tableau pile can go to center
     for (const pile of player.tableau) {
       if (!pile.length) continue;
       const top = pile[pile.length - 1];
       if (top.faceUp && findCenterTarget(top) !== null) return true;
     }
 
-    // Scan all remaining hand cards — if any could go to center when drawn, there's still potential
-    for (const card of player.handSlots) {
-      if (card && findCenterTarget(card) !== null) return true;
+    // 3. Check the currently visible waste top (always directly playable right now)
+    const wasteTop = getWasteTop(player);
+    if (wasteTop && findCenterTarget(wasteTop.card) !== null) return true;
+
+    // Also simulate the full draw cycle: only the top card of each 3-card chunk is playable
+    {
+      const slots = player.handSlots;
+      const cursor = player.drawCursor;
+      const ordered = [];
+      for (let i = cursor; i < slots.length; i++) { if (slots[i]) ordered.push(slots[i]); }
+      for (let i = 0; i < cursor; i++) { if (slots[i]) ordered.push(slots[i]); }
+      for (let i = 2; i < ordered.length; i += 3) {
+        if (findCenterTarget(ordered[i]) !== null) return true;
+      }
+      const remainder = ordered.length % 3;
+      if (remainder > 0 && findCenterTarget(ordered[ordered.length - 1]) !== null) return true;
     }
 
     return false;
   }
 
   function reshuffleDrawPile(player) {
-    const remaining = player.handSlots.filter(Boolean);
-    if (!remaining.length) return;
-    const reordered = shuffled(remaining);
-    player.handSlots = Array(player.handSlots.length).fill(null);
-    reordered.forEach((card, i) => { player.handSlots[i] = card; });
+    // Collect cards in current draw order: from cursor onward, then wrap to start
+    const slots = player.handSlots;
+    const cursor = player.drawCursor;
+    const ordered = [];
+    for (let i = cursor; i < slots.length; i++) { if (slots[i]) ordered.push(slots[i]); }
+    for (let i = 0; i < cursor; i++) { if (slots[i]) ordered.push(slots[i]); }
+    if (ordered.length <= 1) return;
+    // Move 1 card from top (next to be drawn) to bottom so next pass shows new cards
+    ordered.push(ordered.shift());
+    player.handSlots = ordered.concat(Array(slots.length - ordered.length).fill(null));
     player.drawCursor = 0;
     player.currentChunk = [];
     player.wasteHistory = [];
@@ -559,6 +576,7 @@
 
   function checkStuck() {
     if (!state.running || state.dealAnimating || state.awaitingReady) return;
+    if (state.rotateProposed) return; // already waiting for agreement
     const now = Date.now();
     if (now - state.lastStuckCheck < 3000) return;
     if (now - state.lastReshuffle < 5000) return;
@@ -566,12 +584,19 @@
 
     if (state.players.some(hasAnyProgressMove)) return;
 
-    state.lastReshuffle = now;
-    for (const player of state.players) {
-      reshuffleDrawPile(player);
-    }
-    announce("Stuck — draw piles reshuffled!", "No legal moves for any player.", 3500);
-    addLog("<strong>Game stuck.</strong> All draw piles reshuffled.");
+    console.log("[Nertz] Stuck detected — proposing rotation. Players:", state.players.map(p => p.name));
+    state.rotateProposed = true;
+    render();
+  }
+
+  function executeRotate() {
+    state.rotateProposed = false;
+    state.lastReshuffle = Date.now();
+    state.lastActivityAt = Date.now();
+    state.lastNertzPlayAt = Date.now();
+    for (const player of state.players) reshuffleDrawPile(player);
+    announce("Draw piles rotated!", "Top card moved to bottom of each draw pile.", 2500);
+    addLog("<strong>Draw piles rotated.</strong> Top card moved to bottom of each draw pile.");
     render();
   }
 
@@ -1069,7 +1094,7 @@
     if (wasteTop) {
       const centerTarget = findCenterTarget(wasteTop.card);
       if (centerTarget !== null) {
-        moves.push({ kind: "toCenter", source: { type: "waste" }, centerTarget, priority: 75 });
+        moves.push({ kind: "toCenter", source: { type: "waste" }, centerTarget, priority: 90 });
       }
 
       for (let i = 0; i < player.tableau.length; i += 1) {
@@ -1087,15 +1112,24 @@
         continue;
       }
 
-      const top = pile[pile.length - 1];
-      if (top.faceUp) {
-        const centerTarget = findCenterTarget(top);
+      // Scan all face-up cards in this pile for center plays.
+      // Only the top card can be played directly; for deeper cards, also add
+      // tableau moves that would expose them (handled below).
+      for (let ci = pile.length - 1; ci >= 0; ci--) {
+        const card = pile[ci];
+        if (!card.faceUp) break;
+        const centerTarget = findCenterTarget(card);
         if (centerTarget !== null) {
-          let priority = 84;
-          if (pile.length > 1 && !pile[pile.length - 2].faceUp) {
-            priority += 12;
+          if (ci === pile.length - 1) {
+            // Top card — can play directly to center
+            let priority = 95;
+            if (pile.length > 1 && !pile[pile.length - 2].faceUp) {
+              priority += 10; // uncovering face-down bonus
+            }
+            moves.push({ kind: "toCenter", source: { type: "tableau", pile: src, index: ci }, centerTarget, priority });
           }
-          moves.push({ kind: "toCenter", source: { type: "tableau", pile: src }, centerTarget, priority });
+          // For non-top cards, the tableau→tableau loop below will generate
+          // moves to clear the cards above; those moves get a center-exposure bonus.
         }
       }
 
@@ -1136,6 +1170,14 @@
 
           if (idx === 0 && nertzTop && pile.length > 0) {
             priority += 6;
+          }
+
+          // Bonus if moving this run would expose a card beneath that can go to center
+          if (idx > 0 && priority > 0) {
+            const cardBelow = pile[idx - 1];
+            if (cardBelow && cardBelow.faceUp && findCenterTarget(cardBelow) !== null) {
+              priority = Math.min(priority + 25, 92);
+            }
           }
 
           moves.push({
@@ -1273,7 +1315,9 @@
     const firstCard = picked.run[0];
 
     if (destination.length === 0) {
-      if (!(picked.source.type === "nertz" || picked.source.type === "tableau")) {
+      if (picked.source.type === "waste" || picked.source.type === "nertz" || picked.source.type === "tableau") {
+        // all sources allowed onto an empty pile
+      } else {
         return false;
       }
     } else {
@@ -1316,10 +1360,14 @@
     }
 
     if (source.type === "waste") {
-      const top = getWasteTop(player);
-      if (!top) {
-        return null;
+      // If a specific slot index was stored on the source, pick that card directly
+      if (source.index !== undefined) {
+        const card = player.handSlots[source.index];
+        if (!card) return null;
+        return { source, card, run: [card], wasteIndex: source.index };
       }
+      const top = getWasteTop(player);
+      if (!top) return null;
       return { source, card: top.card, run: [top.card], wasteIndex: top.index };
     }
 
@@ -1351,6 +1399,8 @@
 
   function removePickedCard(player, picked) {
     const src = picked.source;
+    // Any card play cancels a pending rotation proposal
+    state.rotateProposed = false;
 
     if (src.type === "nertz") {
       player.nertz.pop();
@@ -1363,11 +1413,9 @@
     }
 
     if (src.type === "waste") {
-      const top = getWasteTop(player);
-      if (!top) {
-        return;
-      }
-      player.handSlots[top.index] = null;
+      const removeIdx = picked.wasteIndex ?? getWasteTop(player)?.index;
+      if (removeIdx == null) return;
+      player.handSlots[removeIdx] = null;
       cleanCurrentChunk(player);
       state.lastActivityAt = Date.now();
       return;
@@ -1383,6 +1431,7 @@
   }
 
   function drawFromHand(player) {
+    player.deckWrapped = false;
     if (remainingHandCount(player) === 0) {
       player.currentChunk = [];
       return false;
@@ -1418,7 +1467,9 @@
     player.currentChunk = picks;
     pushWasteHistory(player, picks);
     const last = picks[picks.length - 1];
-    player.drawCursor = last + 1 >= slots.length ? 0 : last + 1;
+    const nextCursor = last + 1;
+    player.deckWrapped = nextCursor >= slots.length;
+    player.drawCursor = player.deckWrapped ? 0 : nextCursor;
 
     if (player.isHuman) {
       state.selected = null;
@@ -1815,12 +1866,11 @@
 
   function openEndModal(winner) {
     const scored = state.players.map((player) => {
-      const total = player.centerPlayed - player.nertz.length * 2;
       return {
         name: player.name,
         center: player.centerPlayed,
         nertzRemaining: player.nertz.length,
-        total
+        total: player.centerPlayed
       };
     });
 
@@ -1860,6 +1910,21 @@
 
     const sourceEl = event.target.closest("[data-source]");
     if (sourceEl) {
+      // Source clicks are handled by onPointerDown/onPointerUp.
+      // But if state.selected is set, also try the source's parent as a placement target
+      // so that clicking a card inside an eligible pile always attempts placement.
+      if (state.selected && state.running && !state.dealAnimating && !state.awaitingReady) {
+        const parentTarget = sourceEl.closest("[data-target]");
+        if (parentTarget) {
+          // onPointerDown already called onSourcePicked; this is a no-op if that succeeded.
+          // If it failed (e.g. target not found there), this gives a second chance.
+          // Guard: only act if selection is still set (i.e. onPointerDown didn't already place it).
+          if (state.selected) {
+            event.preventDefault();
+            onTargetPicked(parentTarget, event.clientX, event.clientY);
+          }
+        }
+      }
       return;
     }
 
@@ -1875,6 +1940,10 @@
       if (nearest && nearest.targetEl) {
         event.preventDefault();
         onTargetPicked(nearest.targetEl, event.clientX, event.clientY);
+      } else {
+        state.selected = null;
+        clearSelectionGhost();
+        render();
       }
     }
   }
@@ -2208,6 +2277,10 @@
       source.index = Number(sourceEl.dataset.index);
     }
 
+    if (source.type === "waste" && sourceEl.dataset.wasteIndex !== undefined) {
+      source.index = Number(sourceEl.dataset.wasteIndex);
+    }
+
     return source;
   }
 
@@ -2328,7 +2401,7 @@
       const firstCard = picked.run[0];
 
       if (destination.length === 0) {
-        return picked.source.type === "nertz" || picked.source.type === "tableau";
+        return picked.source.type === "nertz" || picked.source.type === "tableau" || picked.source.type === "waste";
       }
 
       return canStackOnTableau(firstCard, destination[destination.length - 1]);
@@ -2420,14 +2493,27 @@
     renderLog();
     syncSelectionGhost();
     if (el.forceReshuffleBtn) {
+      const active = state.running && !state.dealAnimating && !state.awaitingReady;
+
+      // If rotation was proposed but a valid move appeared, cancel the proposal
+      if (state.rotateProposed && active && state.players.some(hasAnyProgressMove)) {
+        state.rotateProposed = false;
+      }
+
       const totalNertz = state.players.reduce((s, p) => s + p.nertz.length, 0);
       const initialNertz = 13 * state.players.length;
       const fraction = initialNertz > 0 ? totalNertz / initialNertz : 1;
-      const threshold = Math.round(30000 + fraction * (120000 - 30000));
+      const threshold = Math.round(15000 + fraction * (75000 - 15000));
       const lastAct = state.lastActivityAt ?? state.lastNertzPlayAt;
-      const show = state.running && !state.dealAnimating && !state.awaitingReady &&
-        lastAct != null && Date.now() - lastAct > threshold;
+      const timerShow = active && lastAct != null && Date.now() - lastAct > threshold;
+
+      const show = active && (state.rotateProposed || timerShow);
       el.forceReshuffleBtn.style.display = show ? "block" : "none";
+      if (show) {
+        el.forceReshuffleBtn.textContent = state.rotateProposed
+          ? "Everyone's Stuck — Rotate Piles?"
+          : "Rotate Draw Piles";
+      }
     }
   }
 
@@ -2481,7 +2567,10 @@
 
   function renderBots() {
     const bots = state.players.filter((p) => !p.isHuman);
-    el.botRow.style.gridTemplateColumns = bots.length > 1 ? `repeat(${bots.length}, minmax(0, 1fr))` : "1fr";
+    const stackBots = window.innerWidth <= BOT_STACK_BREAKPOINT;
+    el.botRow.style.gridTemplateColumns = stackBots || bots.length <= 1
+      ? "1fr"
+      : `repeat(${bots.length}, minmax(0, 1fr))`;
 
     el.botRow.innerHTML = bots
       .map((bot) => {
@@ -2641,16 +2730,11 @@
     const wasteHtml = wasteCards.length
       ? wasteCards
           .map((entry, idx) => {
-            const isPlayable = entry.isPlayable;
-            const selected = isPlayable && isSameSelection(state.selected, { type: "waste" });
-            const cardMarkup = renderCard(entry.card, {
-              faceUp: true,
-              selected,
-              small: false
-            });
-
+            const selected = isSameSelection(state.selected, { type: "waste", index: entry.index });
+            const cardMarkup = renderCard(entry.card, { faceUp: true, selected });
             return `
-              <div class="${isPlayable ? "source-card" : ""}" style="position:absolute;left:${idx * WASTE_SPREAD_STEP}px;top:0;z-index:${10 + idx};" ${isPlayable ? 'data-source="waste"' : ""}>
+              <div class="source-card" style="position:absolute;left:${idx * WASTE_SPREAD_STEP}px;top:0;z-index:${10 + idx};"
+                   data-source="waste" data-waste-index="${entry.index}">
                 ${cardMarkup}
               </div>
             `;
@@ -2658,12 +2742,18 @@
           .join("")
       : '<div class="ghost-slot"></div>';
 
-    const stockCards = remainingHandCount(human) > 0
-      ? `
-          <div class="card face-down"></div>
-          <div class="card face-down"></div>
-          <div class="card face-down"></div>
-        `
+    const toFlip = (() => {
+      let count = 0;
+      const slots = human.handSlots;
+      const cursor = human.drawCursor;
+      for (let i = cursor; i < slots.length; i++) {
+        if (slots[i]) count++;
+      }
+      return count;
+    })();
+    const stockLayers = (toFlip === 0 || human.deckWrapped) ? 0 : toFlip <= 4 ? 1 : toFlip <= 10 ? 2 : toFlip <= 20 ? 3 : 4;
+    const stockCards = stockLayers > 0
+      ? Array.from({ length: stockLayers }, () => `<div class="card face-down"></div>`).join("")
       : '<div class="ghost-slot"></div>';
 
     const drawLane = `
@@ -2682,16 +2772,19 @@
 
     const nertzLane = (() => {
       const nertzCard = topNertz && visibleNertz > 0
-        ? `<div class="source-card" data-source="nertz">${renderCard(topNertz, { faceUp: true, selected: isSameSelection(state.selected, { type: "nertz" }) })}</div>`
+        ? `<div class="source-card" data-source="nertz" style="position:absolute;top:0;left:0;z-index:10">${renderCard(topNertz, { faceUp: true, selected: isSameSelection(state.selected, { type: "nertz" }) })}</div>`
         : '<div class="ghost-slot"></div>';
-      const nertzBack = visibleNertz > 1
-        ? `<div class="card face-down" style="position:absolute;top:4px;left:4px;z-index:0"></div>`
-        : "";
+      const nertzCount = human.nertz.length;
+      const nertzLayers = nertzCount <= 3 ? 0 : nertzCount <= 6 ? 1 : nertzCount <= 9 ? 2 : nertzCount <= 11 ? 3 : 4;
+      const nertzBacks = Array.from({ length: nertzLayers }, (_, i) => {
+        const offset = (nertzLayers - i) * 2;
+        return `<div class="card face-down" style="position:absolute;top:${offset}px;left:${offset}px;z-index:${i}"></div>`;
+      }).join("");
       return `
         <div class="tableau-pile nertz-lane" data-player-id="${human.id}" data-zone="nertz">
           <div class="pile-label">Nertz</div>
           <div class="pile-stack" style="min-height:var(--card-h);">
-            <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);">${nertzBack}${nertzCard}</div>
+            <div style="position:relative;width:var(--card-w);height:var(--card-h);margin:0 auto;">${nertzBacks}${nertzCard}</div>
           </div>
         </div>
       `;

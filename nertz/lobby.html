@@ -295,6 +295,68 @@
         font-size: 0.82rem;
       }
 
+      @media (max-width: 600px) {
+        .name-row {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 8px;
+        }
+
+        .name-row label {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .code-input-row {
+          flex-direction: column;
+        }
+
+        .code-input-row button {
+          width: 100%;
+        }
+
+        .room-item {
+          flex-wrap: wrap;
+        }
+
+        .room-item .btn-secondary {
+          width: 100%;
+        }
+
+        .room-code-display {
+          flex-wrap: wrap;
+          row-gap: 8px;
+        }
+
+        .copy-hint {
+          margin-left: 0;
+          width: 100%;
+        }
+
+        .host-settings {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .host-settings label {
+          flex: 1 1 160px;
+          justify-content: space-between;
+        }
+
+        .room-actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .room-actions button {
+          width: 100%;
+        }
+
+        .room-actions .btn-inline {
+          margin-left: 0;
+        }
+      }
+
       @media (max-width: 480px) {
         .action-row { grid-template-columns: 1fr; }
         .room-code-value { font-size: 1.5rem; }

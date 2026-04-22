@@ -1,16 +1,10 @@
-// ── Firebase Setup ─────────────────────────────────────────────────────────
-// 1. Go to https://console.firebase.google.com → "Add project"
-// 2. In the project, go to Build → Realtime Database → Create database
-//    (choose "Start in test mode" for now)
-// 3. Go to Project Settings → Your apps → Add app (Web) → copy the config
-// 4. Paste the values below
-// ───────────────────────────────────────────────────────────────────────────
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",        // e.g. https://my-project-default-rtdb.firebaseio.com
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyADW72Mm5epDGAfdR-38K37VGRYJ_geosw",
+  authDomain: "nertz-online-8c590.firebaseapp.com",
+  databaseURL: "https://nertz-online-8c590-default-rtdb.firebaseio.com",
+  projectId: "nertz-online-8c590",
+  storageBucket: "nertz-online-8c590.firebasestorage.app",
+  messagingSenderId: "22201799456",
+  appId: "1:22201799456:web:5d0be59b2fe6cc9408bd45",
+  measurementId: "G-H5YCLDC21C"
 };
