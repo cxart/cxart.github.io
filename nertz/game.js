@@ -2749,7 +2749,7 @@
         name: player.name,
         center: player.centerPlayed,
         nertzRemaining: player.nertz.length,
-        total: player.centerPlayed
+        total: player.centerPlayed - player.nertz.length * 2
       };
     });
 
@@ -3696,16 +3696,8 @@
           .join("")
       : '<div class="ghost-slot"></div>';
 
-    const toFlip = (() => {
-      let count = 0;
-      const slots = human.handSlots;
-      const cursor = human.drawCursor;
-      for (let i = cursor; i < slots.length; i++) {
-        if (slots[i]) count++;
-      }
-      return count;
-    })();
-    const stockLayers = (toFlip === 0 || human.deckWrapped) ? 0 : toFlip <= 4 ? 1 : toFlip <= 10 ? 2 : toFlip <= 20 ? 3 : 4;
+    const remainingHand = remainingHandCount(human);
+    const stockLayers = remainingHand === 0 ? 0 : remainingHand <= 4 ? 1 : remainingHand <= 10 ? 2 : remainingHand <= 20 ? 3 : 4;
     const stockCards = stockLayers > 0
       ? Array.from({ length: stockLayers }, () => `<div class="card face-down"></div>`).join("")
       : '<div class="ghost-slot"></div>';
