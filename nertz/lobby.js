@@ -508,12 +508,14 @@ async function startGame() {
 
 function navigateToGame(roomData) {
   if (state.unsubRoom) { state.unsubRoom(); state.unsubRoom = null; }
-  const maxPlayers = clampRoomSize(roomData.maxPlayers || MAX_ROOM_PLAYERS);
+  const seatedPlayers = normalizeRoomPlayers(roomData || {});
+  const activeSeatCount = seatedPlayers.length + countActiveBotSlots(roomData || {}, seatedPlayers);
+  const playerCount = Math.max(MIN_ROOM_PLAYERS, Math.min(MAX_ROOM_PLAYERS, activeSeatCount));
   const params = new URLSearchParams({
     room: roomData.code,
     pid: MY_ID,
     difficulty: roomData.difficulty || "medium",
-    playerCount: String(maxPlayers)
+    playerCount: String(playerCount)
   });
   window.location.href = `index.html?${params.toString()}`;
 }
