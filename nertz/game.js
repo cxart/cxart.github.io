@@ -2093,9 +2093,6 @@
         moved = false;
     }
 
-    if (moved && isOnlineMultiHumanMatch()) {
-      clearRotateConsents();
-    }
     return moved;
   }
 
