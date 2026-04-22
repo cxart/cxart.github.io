@@ -145,6 +145,7 @@
       el.forceReshuffleBtn.addEventListener("click", () => {
         for (const player of state.players) reshuffleDrawPile(player);
         state.lastNertzPlayAt = Date.now();
+        state.lastActivityAt = Date.now();
         state.lastReshuffle = Date.now();
         el.forceReshuffleBtn.style.display = "none";
         announce("Draw piles reshuffled!", "Keep playing.", 2500);
@@ -395,6 +396,7 @@
     state.lastStuckCheck = 0;
     state.lastReshuffle = 0;
     state.lastNertzPlayAt = Date.now();
+    state.lastActivityAt = Date.now();
     state.dealAnimating = true;
     state.dealToken += 1;
     state.awaitingReady = false;
@@ -1356,6 +1358,7 @@
         player.nertz[player.nertz.length - 1].faceUp = true;
       }
       state.lastNertzPlayAt = Date.now();
+      state.lastActivityAt = Date.now();
       return;
     }
 
@@ -1366,6 +1369,7 @@
       }
       player.handSlots[top.index] = null;
       cleanCurrentChunk(player);
+      state.lastActivityAt = Date.now();
       return;
     }
 
@@ -1395,6 +1399,13 @@
     for (let i = cursor; i < slots.length && picks.length < 3; i += 1) {
       if (slots[i]) {
         picks.push(i);
+      }
+    }
+
+    if (picks.length === 0) {
+      // Wrap around and retry from the beginning
+      for (let i = 0; i < slots.length && picks.length < 3; i += 1) {
+        if (slots[i]) picks.push(i);
       }
     }
 
@@ -2409,8 +2420,13 @@
     renderLog();
     syncSelectionGhost();
     if (el.forceReshuffleBtn) {
+      const totalNertz = state.players.reduce((s, p) => s + p.nertz.length, 0);
+      const initialNertz = 13 * state.players.length;
+      const fraction = initialNertz > 0 ? totalNertz / initialNertz : 1;
+      const threshold = Math.round(30000 + fraction * (120000 - 30000));
+      const lastAct = state.lastActivityAt ?? state.lastNertzPlayAt;
       const show = state.running && !state.dealAnimating && !state.awaitingReady &&
-        state.lastNertzPlayAt != null && Date.now() - state.lastNertzPlayAt > 120000;
+        lastAct != null && Date.now() - lastAct > threshold;
       el.forceReshuffleBtn.style.display = show ? "block" : "none";
     }
   }
