@@ -1960,7 +1960,10 @@
   }
 
   function svgDataUri(svg) {
-    return `url('data:image/svg+xml,${encodeURIComponent(svg)}')`;
+    const encoded = encodeURIComponent(svg)
+      .replace(/'/g, "%27")
+      .replace(/"/g, "%22");
+    return `url("data:image/svg+xml,${encoded}")`;
   }
 
   function patternToCss(pattern, color2) {
