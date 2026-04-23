@@ -195,7 +195,7 @@
     if (seat === 0) {
       return "You";
     }
-    return BOT_NAMES[seat - 1] || `Bot ${seat}`;
+    return `Bot ${seat}`;
   }
 
   function handicapOptionsHtml(selectedValue) {

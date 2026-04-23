@@ -271,46 +271,52 @@ select {
 
 .setup-handicap-panel {
   margin-top: 12px;
-  padding: 10px 12px;
+  padding: 7px 8px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
 }
 
 .setup-handicap-title {
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 .setup-handicap-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px 6px;
 }
 
 .setup-handicap-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  border-radius: 9px;
+  gap: 5px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 6px 8px;
+  padding: 3px 5px;
+  min-width: 0;
 }
 
 .setup-handicap-name {
-  font-size: 0.82rem;
+  font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .setup-handicap-item select {
-  min-width: 72px;
-  padding: 6px 8px;
+  min-width: 48px;
+  padding: 3px 4px;
+  font-size: 0.7rem;
+  border-radius: 7px;
 }
 
 .setup-actions {
