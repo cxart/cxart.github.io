@@ -14,7 +14,9 @@
   --shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
   --back-color-1: #7a1621;
   --back-color-2: #b03641;
-  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
+  --back-ring: var(--back-color-2);
+  --back-inner: var(--back-color-1);
+  --back-size: auto;
   --back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 8px, rgba(255, 255, 255, 0.03) 8px 16px);
 }
 
@@ -222,8 +224,10 @@ h1 {
   position: absolute;
   inset: 2px;
   border-radius: 4px;
-  background: var(--back-pattern);
+  background-color: var(--back-inner, var(--back-color-1));
+  background-image: var(--back-pattern);
   background-size: var(--back-pattern-size, auto);
+  background-position: center;
 }
 
 .back-preview-mini::after {
@@ -235,7 +239,7 @@ h1 {
 }
 
 .back-preview-mini[data-pattern] {
-  background: var(--back-bg, linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2)));
+  background: var(--back-ring, var(--back-color-2));
 }
 
 .btn-cardback {
@@ -724,7 +728,7 @@ body.dragging-card .source-card {
 }
 
 .card.face-down {
-  background: var(--card-back-bg, var(--back-bg));
+  background: var(--card-back-ring, var(--back-ring));
   overflow: hidden;
 }
 
@@ -737,8 +741,10 @@ body.dragging-card .source-card {
 }
 
 .card.face-down::before {
-  background: var(--card-back-pattern, var(--back-pattern));
-  background-size: var(--card-back-size, auto);
+  background-color: var(--card-back-inner, var(--back-inner));
+  background-image: var(--card-back-pattern, var(--back-pattern));
+  background-size: var(--card-back-size, var(--back-size, auto));
+  background-position: center;
 }
 
 .card.face-down::after {
@@ -990,46 +996,41 @@ body.dragging-card .source-card {
 }
 
 body[data-back-style="weave"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
+  --back-ring: var(--back-color-2);
+  --back-inner: var(--back-color-1);
   --back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 8px, rgba(255, 255, 255, 0.03) 8px 16px);
 }
 
 body[data-back-style="dots"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
-  --back-pattern: radial-gradient(circle at center, rgba(255, 255, 255, 0.22) 0 3px, transparent 3px 12px),
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.12) 0 3px, transparent 4px 10px);
-}
-
-body[data-back-style="dots"] .card.face-down::before {
-  background-size: var(--card-back-size, 20px 20px);
+  --back-ring: var(--back-color-2);
+  --back-inner: var(--back-color-1);
+  --back-size: 100% 100%;
 }
 
 body[data-back-style="grid"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
+  --back-ring: var(--back-color-2);
+  --back-inner: var(--back-color-1);
   --back-pattern: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px);
 }
 
-body[data-back-style="stars"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
-  --back-pattern: radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0 2px, transparent 2px 12px),
-    conic-gradient(from 20deg, rgba(255, 255, 255, 0.14), transparent 40%, rgba(255, 255, 255, 0.14));
-}
-
-body[data-back-style="stars"] .card.face-down::before {
-  background-size: var(--card-back-size, 20px 20px);
+body[data-back-style="spiral"] {
+  --back-ring: var(--back-color-2);
+  --back-inner: var(--back-color-1);
+  --back-size: 100% 100%;
 }
 
 body[data-back-style="hex"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
+  --back-ring: var(--back-color-2);
+  --back-inner: var(--back-color-1);
   --back-pattern: repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 8px),
     repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 8px);
 }
 
 body[data-back-style="diamond"] {
-  --back-bg: linear-gradient(140deg, var(--back-color-1) 45%, var(--back-color-2));
-  --back-pattern: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px),
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.15) 0 1px, transparent 1px 14px);
+  --back-ring: var(--back-color-2);
+  --back-inner: var(--back-color-1);
+  --back-size: 100% 100%;
 }
 
 #bot-row[data-bot-count="4"] .bot-seat {

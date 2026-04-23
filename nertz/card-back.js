@@ -6,6 +6,10 @@
     return `rgba(${r},${g},${b},${alpha})`;
   }
 
+  function svgDataUri(svg) {
+    return `url("data:image/svg+xml,${svg.replace(/#/g, "%23")}")`;
+  }
+
   const PATTERNS = [
     {
       id: "weave",
@@ -15,10 +19,16 @@
     {
       id: "dots",
       label: "Dots",
-      pattern: c2 =>
-        `radial-gradient(circle at 50% 50%,${hexToRgba(c2,.75)} 0 3px,transparent 3px 12px),` +
-        `radial-gradient(circle at 0 0,${hexToRgba(c2,.45)} 0 3px,transparent 4px 10px)`,
-      size: "20px 20px"
+      pattern: c2 => {
+        const fill = hexToRgba(c2, .82);
+        const cols = [12, 30, 48];
+        const rows = [11, 27, 42, 57, 73];
+        const circles = rows.flatMap(cy => cols.map(cx =>
+          `<circle cx='${cx}' cy='${cy}' r='2.5' fill='${fill}'/>`
+        )).join('');
+        return svgDataUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 84'>${circles}</svg>`);
+      },
+      size: "100% 100%"
     },
     {
       id: "grid",
@@ -28,12 +38,14 @@
         `repeating-linear-gradient(0deg,${hexToRgba(c2,.55)} 0 1px,transparent 1px 10px)`
     },
     {
-      id: "stars",
-      label: "Stars",
-      pattern: c2 =>
-        `radial-gradient(circle at center,${hexToRgba(c2,.70)} 0 2px,transparent 2px 12px),` +
-        `conic-gradient(from 20deg,${hexToRgba(c2,.45)},transparent 40%,${hexToRgba(c2,.45)})`,
-      size: "20px 20px"
+      id: "spiral",
+      label: "Spiral",
+      pattern: c2 => svgDataUri(
+        `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 84'>` +
+        `<path d='M5,3 L55,3 L55,81 L5,81 L5,11 L49,11 L49,73 L11,73 L11,19 L43,19 L43,65 L17,65 L17,27 L37,27 L37,57 L23,57 L23,35 L31,35 L31,49' ` +
+        `fill='none' stroke='${hexToRgba(c2,.72)}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>`
+      ),
+      size: "100% 100%"
     },
     {
       id: "hex",
@@ -45,9 +57,19 @@
     {
       id: "diamond",
       label: "Diamond",
-      pattern: c2 =>
-        `repeating-linear-gradient(45deg,${hexToRgba(c2,.60)} 0 1px,transparent 1px 14px),` +
-        `repeating-linear-gradient(-45deg,${hexToRgba(c2,.60)} 0 1px,transparent 1px 14px)`
+      pattern: c2 => {
+        const s = hexToRgba(c2, .75);
+        return svgDataUri(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 84'>` +
+          `<polygon points='30,8 54,42 30,76 6,42' fill='none' stroke='${s}' stroke-width='2.5' stroke-linejoin='round'/>` +
+          `<rect x='9' y='9' width='6' height='6' rx='2' fill='${s}'/>` +
+          `<rect x='45' y='9' width='6' height='6' rx='2' fill='${s}'/>` +
+          `<rect x='9' y='69' width='6' height='6' rx='2' fill='${s}'/>` +
+          `<rect x='45' y='69' width='6' height='6' rx='2' fill='${s}'/>` +
+          `</svg>`
+        );
+      },
+      size: "100% 100%"
     }
   ];
 
@@ -104,10 +126,6 @@
     return PATTERNS.find(p => p.id === id) || PATTERNS[0];
   }
 
-  function bgGradient(c1, c2) {
-    return `linear-gradient(140deg,${c1} 45%,${c2})`;
-  }
-
   /* ── Pattern swatches ── */
   function buildSwatches() {
     el.patternGrid.innerHTML = "";
@@ -134,12 +152,12 @@
   }
 
   function updateSwatches() {
-    const bg = bgGradient(state.color1, state.color2);
     el.patternGrid.querySelectorAll(".pattern-swatch").forEach(wrap => {
       const id = wrap.dataset.id;
       const pDef = getPatternDef(id);
       const card = wrap.querySelector(".swatch-card");
-      card.style.setProperty("--swatch-bg", bg);
+      card.style.setProperty("--swatch-ring", state.color2);
+      card.style.setProperty("--swatch-inner", state.color1);
       card.style.setProperty("--swatch-pattern", pDef.pattern(state.color2));
       card.style.setProperty("--swatch-size", pDef.size || "auto");
       wrap.classList.toggle("selected", id === state.pattern);
@@ -176,7 +194,8 @@
   /* ── Preview ── */
   function updatePreview() {
     const pDef = getPatternDef(state.pattern);
-    el.previewCard.style.setProperty("--preview-bg", bgGradient(state.color1, state.color2));
+    el.previewCard.style.setProperty("--preview-bg", state.color2);
+    el.previewCard.style.setProperty("--preview-inner", state.color1);
     el.previewCard.style.setProperty("--preview-pattern", pDef.pattern(state.color2));
     el.previewCard.style.setProperty("--preview-size", pDef.size || "auto");
   }

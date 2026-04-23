@@ -38,7 +38,7 @@
     medium: { minDelay: 980, maxDelay: 1700, skill: 0.53, idleChance: 0.24 },
     hard: { minDelay: 760, maxDelay: 1300, skill: 0.7, idleChance: 0.14 }
   };
-  const BACK_PATTERNS = ["weave", "dots", "grid", "stars", "hex", "diamond"];
+  const BACK_PATTERNS = ["weave", "dots", "grid", "spiral", "hex", "diamond"];
   const BACK_PALETTES = [
     ["#17365f", "#2a5ea6"],
     ["#6d1f3b", "#ab3b66"],
@@ -249,8 +249,10 @@
     document.body.setAttribute("data-back-style", back.pattern);
     document.documentElement.style.setProperty("--back-color-1", back.color1);
     document.documentElement.style.setProperty("--back-color-2", back.color2);
-    document.body.style.setProperty("--back-bg", `linear-gradient(140deg, ${back.color1} 45%, ${back.color2})`);
+    document.body.style.setProperty("--back-ring", back.color2);
+    document.body.style.setProperty("--back-inner", back.color1);
     document.body.style.setProperty("--back-pattern", patternToCss(back.pattern, back.color2));
+    document.body.style.setProperty("--back-size", patternSize(back.pattern));
     state.settings.cardBack = back.pattern;
     state.settings.cardBackConfig = back;
     renderBackPreviewMini(back);
@@ -258,9 +260,8 @@
 
   function renderBackPreviewMini(back) {
     if (!el.backPreviewMini) return;
-    el.backPreviewMini.style.setProperty("--back-color-1", back.color1);
-    el.backPreviewMini.style.setProperty("--back-color-2", back.color2);
-    el.backPreviewMini.style.setProperty("--back-bg", `linear-gradient(140deg, ${back.color1} 45%, ${back.color2})`);
+    el.backPreviewMini.style.setProperty("--back-ring", back.color2);
+    el.backPreviewMini.style.setProperty("--back-inner", back.color1);
     el.backPreviewMini.style.setProperty("--back-pattern", patternToCss(back.pattern, back.color2));
     el.backPreviewMini.style.setProperty("--back-pattern-size", patternSize(back.pattern));
     el.backPreviewMini.setAttribute("data-pattern", back.pattern);
@@ -1839,19 +1840,44 @@
     return `rgba(${r},${g},${b},${alpha})`;
   }
 
+  function svgDataUri(svg) {
+    return `url("data:image/svg+xml,${svg.replace(/#/g, "%23")}")`;
+  }
+
   function patternToCss(pattern, color2) {
     const c = color2 || "#ffffff";
     switch (pattern) {
-      case "dots":
-        return `radial-gradient(circle at center, ${hexToRgba(c,.75)} 0 3px, transparent 3px 12px), radial-gradient(circle at top left, ${hexToRgba(c,.45)} 0 3px, transparent 4px 10px)`;
+      case "dots": {
+        const fill = hexToRgba(c, .82);
+        const cols = [12, 30, 48];
+        const rows = [11, 27, 42, 57, 73];
+        const circles = rows.flatMap(cy => cols.map(cx =>
+          `<circle cx='${cx}' cy='${cy}' r='2.5' fill='${fill}'/>`
+        )).join('');
+        return svgDataUri(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 84'>${circles}</svg>`);
+      }
       case "grid":
         return `repeating-linear-gradient(90deg, ${hexToRgba(c,.55)} 0 1px, transparent 1px 10px), repeating-linear-gradient(0deg, ${hexToRgba(c,.55)} 0 1px, transparent 1px 10px)`;
-      case "stars":
-        return `radial-gradient(circle at center, ${hexToRgba(c,.70)} 0 2px, transparent 2px 12px), conic-gradient(from 20deg, ${hexToRgba(c,.45)}, transparent 40%, ${hexToRgba(c,.45)})`;
+      case "spiral":
+        return svgDataUri(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 84'>` +
+          `<path d='M5,3 L55,3 L55,81 L5,81 L5,11 L49,11 L49,73 L11,73 L11,19 L43,19 L43,65 L17,65 L17,27 L37,27 L37,57 L23,57 L23,35 L31,35 L31,49' ` +
+          `fill='none' stroke='${hexToRgba(c,.72)}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>`
+        );
       case "hex":
         return `repeating-linear-gradient(60deg, ${hexToRgba(c,.55)} 0 1px, transparent 1px 8px), repeating-linear-gradient(-60deg, ${hexToRgba(c,.50)} 0 1px, transparent 1px 8px)`;
-      case "diamond":
-        return `repeating-linear-gradient(45deg, ${hexToRgba(c,.60)} 0 1px, transparent 1px 14px), repeating-linear-gradient(-45deg, ${hexToRgba(c,.60)} 0 1px, transparent 1px 14px)`;
+      case "diamond": {
+        const ds = hexToRgba(c, .75);
+        return svgDataUri(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 84'>` +
+          `<polygon points='30,8 54,42 30,76 6,42' fill='none' stroke='${ds}' stroke-width='2.5' stroke-linejoin='round'/>` +
+          `<rect x='9' y='9' width='6' height='6' rx='2' fill='${ds}'/>` +
+          `<rect x='45' y='9' width='6' height='6' rx='2' fill='${ds}'/>` +
+          `<rect x='9' y='69' width='6' height='6' rx='2' fill='${ds}'/>` +
+          `<rect x='45' y='69' width='6' height='6' rx='2' fill='${ds}'/>` +
+          `</svg>`
+        );
+      }
       case "weave":
       default:
         return `repeating-linear-gradient(45deg, ${hexToRgba(c,.70)} 0 8px, ${hexToRgba(c,.12)} 8px 16px)`;
@@ -1859,17 +1885,17 @@
   }
 
   function patternSize(pattern) {
-    return pattern === "dots" || pattern === "stars" ? "20px 20px" : "auto";
+    if (pattern === "dots" || pattern === "spiral" || pattern === "diamond") return "100% 100%";
+    return "auto";
   }
 
   function cardBackStyle(back) {
     if (!back) {
       return "";
     }
-    const bg = `linear-gradient(140deg, ${back.color1} 45%, ${back.color2})`;
     const pattern = patternToCss(back.pattern, back.color2);
     const size = patternSize(back.pattern);
-    return `--card-back-bg:${bg};--card-back-pattern:${pattern};--card-back-size:${size};`;
+    return `--card-back-ring:${back.color2};--card-back-inner:${back.color1};--card-back-pattern:${pattern};--card-back-size:${size};`;
   }
 
   function getVisiblePileCount(player, pileIdx) {
