@@ -7,7 +7,7 @@
   }
 
   function svgDataUri(svg) {
-    return `url("data:image/svg+xml,${svg.replace(/#/g, "%23")}")`;
+    return `url('data:image/svg+xml,${encodeURIComponent(svg)}')`;
   }
 
   const PATTERNS = [

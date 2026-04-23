@@ -286,8 +286,10 @@ select {
 }
 
 .setup-handicap-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  flex-wrap: nowrap;
   gap: 5px 6px;
 }
 
@@ -300,6 +302,7 @@ select {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 3px 5px;
+  flex: 0 0 102px;
   min-width: 0;
 }
 
@@ -1234,7 +1237,13 @@ body[data-back-style="diamond"] {
   }
 
   .setup-handicap-grid {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .setup-handicap-item {
+    flex: 1 1 120px;
+    max-width: 180px;
   }
 
   .panel-topline {
