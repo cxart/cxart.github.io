@@ -269,6 +269,50 @@ select {
   padding: 8px 10px;
 }
 
+.setup-handicap-panel {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.setup-handicap-title {
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.setup-handicap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.setup-handicap-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 8px;
+}
+
+.setup-handicap-name {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+}
+
+.setup-handicap-item select {
+  min-width: 72px;
+  padding: 6px 8px;
+}
+
 .setup-actions {
   margin-top: 24px;
   display: flex;
@@ -1181,6 +1225,10 @@ body[data-back-style="diamond"] {
 
   .setup-actions #start-btn {
     width: 100%;
+  }
+
+  .setup-handicap-grid {
+    grid-template-columns: 1fr;
   }
 
   .panel-topline {

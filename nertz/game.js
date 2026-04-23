@@ -58,6 +58,7 @@
       playerCount: 3,
       difficulty: "medium",
       setupPattern: null,
+      localHandicaps: [0, 0, 0, 0],
       cardBack: "weave",
       cardBackConfig: { pattern: "weave", color1: "#7a1621", color2: "#b03641" }
     },
@@ -111,6 +112,8 @@
     setupCard: document.getElementById("setup-card"),
     playerCount: document.getElementById("player-count"),
     difficulty: document.getElementById("difficulty"),
+    setupPattern: document.getElementById("setup-pattern"),
+    setupHandicapPanel: document.getElementById("setup-handicap-panel"),
     backPreviewMini: document.getElementById("back-preview-mini"),
     startBtn: document.getElementById("start-btn"),
     newRoundBtn: document.getElementById("new-round-btn"),
@@ -188,6 +191,75 @@
     }));
   }
 
+  function localPlayerNameBySeat(seat) {
+    if (seat === 0) {
+      return "You";
+    }
+    return BOT_NAMES[seat - 1] || `Bot ${seat}`;
+  }
+
+  function handicapOptionsHtml(selectedValue) {
+    const selected = normalizeHandicap(selectedValue);
+    const options = [];
+    for (let value = -6; value <= 6; value += 1) {
+      const label = value > 0 ? `+${value}` : String(value);
+      options.push(`<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`);
+    }
+    return options.join("");
+  }
+
+  function renderLocalHandicapControls() {
+    if (!el.setupHandicapPanel) {
+      return;
+    }
+    const count = clamp(Number(el.playerCount?.value) || state.settings.playerCount, 2, 4);
+    const rows = [];
+    for (let seat = 0; seat < count; seat += 1) {
+      const current = normalizeHandicap(state.settings.localHandicaps?.[seat]);
+      rows.push(`
+        <label class="setup-handicap-item">
+          <span class="setup-handicap-name">${escapeHtml(localPlayerNameBySeat(seat))}</span>
+          <select data-local-handicap-seat="${seat}">
+            ${handicapOptionsHtml(current)}
+          </select>
+        </label>
+      `);
+    }
+    el.setupHandicapPanel.innerHTML = `
+      <div class="setup-handicap-title">Starting Nertz Handicap</div>
+      <div class="setup-handicap-grid">
+        ${rows.join("")}
+      </div>
+    `;
+  }
+
+  function onLocalHandicapChanged(event) {
+    const select = event.target.closest("[data-local-handicap-seat]");
+    if (!select) {
+      return;
+    }
+    const seat = Number(select.dataset.localHandicapSeat);
+    if (!Number.isInteger(seat) || seat < 0 || seat >= 4) {
+      return;
+    }
+    state.settings.localHandicaps[seat] = normalizeHandicap(select.value);
+  }
+
+  function buildLocalPlayerSpecsFromSetup(playerCount, difficulty) {
+    const count = clamp(Number(playerCount) || state.settings.playerCount, 2, 4);
+    const specs = [];
+    for (let seat = 0; seat < count; seat += 1) {
+      specs.push({
+        isHuman: seat === 0,
+        isNetworkPlayer: false,
+        networkId: null,
+        difficulty: normalizeDifficulty(difficulty),
+        handicap: normalizeHandicap(state.settings.localHandicaps?.[seat])
+      });
+    }
+    return specs;
+  }
+
   function init() {
     el.startBtn.addEventListener("click", () => startMatch());
     if (el.newRoundBtn) {
@@ -203,6 +275,18 @@
       });
     }
     loadCardBack();
+    if (el.setupPattern) {
+      el.setupPattern.value = "1-2-3-4";
+    }
+    if (el.playerCount) {
+      el.playerCount.addEventListener("change", () => {
+        renderLocalHandicapControls();
+      });
+    }
+    if (el.setupHandicapPanel) {
+      el.setupHandicapPanel.addEventListener("change", onLocalHandicapChanged);
+    }
+    renderLocalHandicapControls();
 
     el.clearSelectionBtn.addEventListener("click", () => {
       state.selected = null;
@@ -215,8 +299,11 @@
     });
 
     if (el.forceReshuffleBtn) {
-      el.forceReshuffleBtn.addEventListener("click", () => {
+      el.forceReshuffleBtn.addEventListener("click", (event) => {
         onRotateButtonPressed();
+        if (event.currentTarget && typeof event.currentTarget.blur === "function") {
+          event.currentTarget.blur();
+        }
       });
     }
 
@@ -241,11 +328,13 @@
   }
 
   function loadCardBack() {
-    let back = { pattern: "weave", color1: "#7a1621", color2: "#b03641" };
+    const fallback = { pattern: "weave", color1: "#7a1621", color2: "#b03641" };
+    let back = fallback;
     try {
       const saved = localStorage.getItem("nertz_cardback");
       if (saved) back = JSON.parse(saved);
     } catch (e) {}
+    back = sanitizeCardBack(back, fallback);
     document.body.setAttribute("data-back-style", back.pattern);
     document.documentElement.style.setProperty("--back-color-1", back.color1);
     document.documentElement.style.setProperty("--back-color-2", back.color2);
@@ -358,6 +447,9 @@
     }
     if (el.difficulty) {
       el.difficulty.value = forcedSettings.difficulty;
+    }
+    if (el.setupPattern) {
+      el.setupPattern.value = normalizeSetupPattern(forcedSettings.setupPattern, "1-2-3-4");
     }
 
     if (state.online.syncReady && !state.online.isHost) {
@@ -589,9 +681,10 @@
   }
 
   function botBackForSeat(seatIdx) {
-    const pattern = BACK_PATTERNS[(seatIdx * 3 + 1) % BACK_PATTERNS.length];
-    const palette = BACK_PALETTES[(seatIdx * 5 + 2) % BACK_PALETTES.length];
-    return { pattern, color1: palette[0], color2: palette[1] };
+    const seat = Number.isFinite(Number(seatIdx)) ? Math.max(0, Math.floor(Number(seatIdx))) : 0;
+    const pattern = BACK_PATTERNS[(seat * 3 + 1) % BACK_PATTERNS.length];
+    const palette = BACK_PALETTES[(seat * 5 + 2) % BACK_PALETTES.length];
+    return sanitizeCardBack({ pattern, color1: palette[0], color2: palette[1] }, state.settings.cardBackConfig);
   }
 
   function deriveSeatPlanFromRoom(roomData) {
@@ -729,16 +822,30 @@
   }
 
   function sanitizeCardBack(back, fallback = null) {
+    const safeFallback = fallback && typeof fallback === "object" ? fallback : {
+      pattern: "weave",
+      color1: "#7a1621",
+      color2: "#b03641"
+    };
+    const fallbackPattern = BACK_PATTERNS.includes(String(safeFallback.pattern))
+      ? String(safeFallback.pattern)
+      : "weave";
+    const fallbackColor1 = isValidHexColor(safeFallback.color1) ? String(safeFallback.color1) : "#7a1621";
+    const fallbackColor2 = isValidHexColor(safeFallback.color2) ? String(safeFallback.color2) : "#b03641";
     if (!back || typeof back !== "object") {
-      return fallback;
+      return {
+        pattern: fallbackPattern,
+        color1: fallbackColor1,
+        color2: fallbackColor2
+      };
     }
-    if (!back.pattern || !back.color1 || !back.color2) {
-      return fallback;
-    }
+    const patternRaw = String(back.pattern || "").trim();
+    const color1Raw = String(back.color1 || "").trim();
+    const color2Raw = String(back.color2 || "").trim();
     return {
-      pattern: String(back.pattern),
-      color1: String(back.color1),
-      color2: String(back.color2)
+      pattern: BACK_PATTERNS.includes(patternRaw) ? patternRaw : fallbackPattern,
+      color1: isValidHexColor(color1Raw) ? color1Raw : fallbackColor1,
+      color2: isValidHexColor(color2Raw) ? color2Raw : fallbackColor2
     };
   }
 
@@ -787,7 +894,10 @@
     const networkId = player?.networkId ? String(player.networkId) : null;
     const isLocal = Boolean(state.online.enabled && networkId && networkId === state.online.playerId);
     const localFallback = state.settings.cardBackConfig;
-    const nonLocalFallback = sanitizeCardBack(fallbackCardBack, null) || botBackForSeat(Number(player?.id) || 0);
+    const seatFallback = botBackForSeat(Number(player?.id) || 0);
+    const nonLocalFallback = fallbackCardBack
+      ? sanitizeCardBack(fallbackCardBack, seatFallback)
+      : seatFallback;
     const handicap = normalizeHandicap(player?.handicap);
     const normalized = {
       ...player,
@@ -1182,15 +1292,23 @@
     } else {
       state.settings.playerCount = Number(el.playerCount.value);
       state.settings.difficulty = el.difficulty.value;
+      state.settings.setupPattern = normalizeSetupPattern(el.setupPattern?.value, null);
       if (!state.online.enabled) {
-        state.settings.setupPattern = null;
+        const localSpecs = buildLocalPlayerSpecsFromSetup(state.settings.playerCount, state.settings.difficulty);
+        state.settings.localHandicaps = localSpecs.map((spec) => normalizeHandicap(spec.handicap));
       }
     }
 
+    let effectiveSpecs = Array.isArray(options.playerSpecs) && options.playerSpecs.length
+      ? options.playerSpecs
+      : null;
+    if (!effectiveSpecs && !state.online.enabled) {
+      effectiveSpecs = buildLocalPlayerSpecsFromSetup(state.settings.playerCount, state.settings.difficulty);
+    }
     state.players = createPlayers(
       state.settings.playerCount,
       state.settings.difficulty,
-      options.playerSpecs || null,
+      effectiveSpecs,
       state.settings.setupPattern
     );
     if (state.online.enabled) {
@@ -1819,16 +1937,17 @@
   }
 
   function generateBotBacks(count, humanBack) {
-    const patternPool = shuffled(BACK_PATTERNS.filter((pattern) => pattern !== humanBack?.pattern));
+    const humanPattern = sanitizeCardBack(humanBack, state.settings.cardBackConfig).pattern;
+    const patternPool = shuffled(BACK_PATTERNS.filter((pattern) => pattern !== humanPattern));
     const backs = [];
     for (let i = 0; i < count; i += 1) {
       const pattern = patternPool[i] || sample(BACK_PATTERNS);
       const palette = sample(BACK_PALETTES);
-      backs.push({
+      backs.push(sanitizeCardBack({
         pattern,
         color1: palette[0],
         color2: palette[1]
-      });
+      }, state.settings.cardBackConfig));
     }
     return backs;
   }
@@ -3097,8 +3216,10 @@
       return;
     }
 
-    const tag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : "";
-    if (tag === "input" || tag === "textarea" || tag === "select" || tag === "button") {
+    const target = event.target;
+    const tag = target && target.tagName ? target.tagName.toLowerCase() : "";
+    const editable = Boolean(target && (target.isContentEditable || target.closest?.("[contenteditable='true']")));
+    if (tag === "input" || tag === "textarea" || tag === "select" || editable) {
       return;
     }
 
@@ -4041,6 +4162,18 @@
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
     return clamp(Math.trunc(n), -6, 6);
+  }
+
+  function isValidHexColor(value) {
+    return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim());
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   function capitalize(text) {
