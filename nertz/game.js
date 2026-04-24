@@ -142,7 +142,8 @@
     rotateConsents: {},
     rotateProposed: false,
     nextGlobalBotActionAt: 0,
-    lastBotActionAt: 0
+    lastBotActionAt: 0,
+    endModalBusy: false
   };
 
   const el = {
@@ -174,6 +175,8 @@
     endTitle: document.getElementById("end-title"),
     endSubtitle: document.getElementById("end-subtitle"),
     scoreboard: document.getElementById("scoreboard"),
+    playAgainBtn: document.getElementById("play-again-btn"),
+    returnLobbyBtn: document.getElementById("return-lobby-btn"),
     closeModalBtn: document.getElementById("close-modal-btn"),
     forceReshuffleBtn: document.getElementById("force-reshuffle-btn")
   };
@@ -335,6 +338,18 @@
     el.closeModalBtn.addEventListener("click", () => {
       el.endModal.classList.add("hidden");
     });
+
+    if (el.playAgainBtn) {
+      el.playAgainBtn.addEventListener("click", () => {
+        void onPlayAgainPressed();
+      });
+    }
+
+    if (el.returnLobbyBtn) {
+      el.returnLobbyBtn.addEventListener("click", () => {
+        onReturnToLobbyPressed();
+      });
+    }
 
     if (el.forceReshuffleBtn) {
       el.forceReshuffleBtn.addEventListener("click", (event) => {
@@ -581,7 +596,10 @@
 
   function onRotateButtonPressed() {
     const active = state.running && !state.dealAnimating && !state.awaitingReady;
-    if (!active) return;
+    if (!active) {
+      announce("Rotate unavailable", "Wait for the round to be fully active.", 1500);
+      return;
+    }
 
     if (isOnlineMultiHumanMatch()) {
       const actorId = localRotateConsentActorId();
@@ -592,8 +610,16 @@
         const me = getLocalPlayer();
         addLog(`<strong>${me?.name || "You"}</strong> ${nextAgree ? "agreed" : "withdrew"} draw-pile rotation.`);
         if (allHumansConsentedToRotate()) {
-          executeRotate();
+          const rotated = executeRotate();
+          if (!rotated) {
+            announce("Rotate unavailable", "No draw cards can be rotated right now.", 1600);
+          }
         } else {
+          announce(
+            nextAgree ? "Rotate vote sent" : "Rotate vote removed",
+            nextAgree ? "Waiting for all players to agree." : "You withdrew your rotation vote.",
+            1600
+          );
           publishOnlineSnapshot();
           render();
         }
@@ -608,7 +634,96 @@
       return;
     }
 
-    executeRotate();
+    const rotated = executeRotate();
+    if (!rotated) {
+      announce("Rotate unavailable", "No draw cards can be rotated right now.", 1600);
+    }
+  }
+
+  function onlineLobbyUrl(roomCode = "", autoJoin = false) {
+    const params = new URLSearchParams();
+    if (roomCode) {
+      params.set("room", String(roomCode).trim().toUpperCase());
+    }
+    if (autoJoin && roomCode) {
+      params.set("autojoin", "1");
+    }
+    const query = params.toString();
+    return query ? `lobby.html?${query}` : "lobby.html";
+  }
+
+  function setEndModalButtonsBusy(isBusy) {
+    state.endModalBusy = Boolean(isBusy);
+    const controls = [el.playAgainBtn, el.returnLobbyBtn, el.closeModalBtn].filter(Boolean);
+    for (const button of controls) {
+      button.disabled = Boolean(isBusy);
+    }
+  }
+
+  async function resetRoomForRematchIfHost() {
+    if (!state.online.enabled || !state.online.isHost || !state.online.roomCode) {
+      return true;
+    }
+
+    const ready = await ensureOnlineFirebase();
+    if (!ready || !state.online.firebaseDb || !state.online.db) {
+      return false;
+    }
+
+    const firebaseDb = state.online.firebaseDb;
+    const roomRef = firebaseDb.ref(state.online.db, `nertz_rooms/${state.online.roomCode}`);
+    const snap = await firebaseDb.get(roomRef);
+    if (!snap.exists()) {
+      return false;
+    }
+
+    const roomData = snap.val() || {};
+    const players = roomData.players && typeof roomData.players === "object" ? roomData.players : {};
+    const updates = {
+      status: "waiting",
+      startedAt: null,
+      game: null,
+      intents: null
+    };
+
+    Object.keys(players).forEach((playerId) => {
+      updates[`players/${playerId}/ready`] = false;
+    });
+
+    await firebaseDb.update(roomRef, updates);
+    return true;
+  }
+
+  async function onPlayAgainPressed() {
+    if (state.endModalBusy) {
+      return;
+    }
+
+    if (!state.online.enabled || !state.online.roomCode) {
+      startMatch();
+      return;
+    }
+
+    setEndModalButtonsBusy(true);
+    try {
+      const ok = await resetRoomForRematchIfHost();
+      if (!ok) {
+        announce("Rematch unavailable", "Unable to reopen the room. Try returning to lobby.", 2200);
+        setEndModalButtonsBusy(false);
+        return;
+      }
+      window.location.href = onlineLobbyUrl(state.online.roomCode, true);
+    } catch (error) {
+      announce("Rematch unavailable", "Unable to reopen the room. Try returning to lobby.", 2200);
+      setEndModalButtonsBusy(false);
+    }
+  }
+
+  function onReturnToLobbyPressed() {
+    if (state.endModalBusy) {
+      return;
+    }
+    window.location.href = "lobby.html";
   }
 
   async function ensureOnlineFirebase() {
@@ -1586,17 +1701,20 @@
   function reshuffleDrawPile(player) {
     // Collect cards in current draw order: from cursor onward, then wrap to start
     const slots = player.handSlots;
-    const cursor = player.drawCursor;
+    if (!Array.isArray(slots) || slots.length <= 1) return false;
+    let cursor = Number.isFinite(Number(player.drawCursor)) ? Math.floor(Number(player.drawCursor)) : 0;
+    cursor = ((cursor % slots.length) + slots.length) % slots.length;
     const ordered = [];
     for (let i = cursor; i < slots.length; i++) { if (slots[i]) ordered.push(slots[i]); }
     for (let i = 0; i < cursor; i++) { if (slots[i]) ordered.push(slots[i]); }
-    if (ordered.length <= 1) return;
+    if (ordered.length <= 1) return false;
     // Move 1 card from top (next to be drawn) to bottom so next pass shows new cards
     ordered.push(ordered.shift());
     player.handSlots = ordered.concat(Array(slots.length - ordered.length).fill(null));
     player.drawCursor = 0;
     player.currentChunk = [];
     player.wasteHistory = [];
+    return true;
   }
 
   function checkStuck() {
@@ -1617,23 +1735,38 @@
 
   function executeRotate() {
     if (state.online.enabled && !state.online.isHost) {
-      return;
+      return false;
     }
     if (isOnlineMultiHumanMatch() && !allHumansConsentedToRotate()) {
-      return;
+      return false;
     }
     state.rotateProposed = false;
     clearRotateConsents();
     state.lastReshuffle = Date.now();
     state.lastActivityAt = Date.now();
     state.lastNertzPlayAt = Date.now();
-    for (const player of state.players) reshuffleDrawPile(player);
+
+    let anyShifted = false;
+    for (const player of state.players) {
+      if (reshuffleDrawPile(player)) {
+        anyShifted = true;
+      }
+    }
+    if (!anyShifted) {
+      if (state.online.enabled && state.online.isHost) {
+        publishOnlineSnapshot();
+      }
+      render();
+      return false;
+    }
+
     announce("Draw piles rotated!", "Top card moved to bottom of each draw pile.", 2500);
     addLog("<strong>Draw piles rotated.</strong> Top card moved to bottom of each draw pile.");
     if (state.online.enabled && state.online.isHost) {
       publishOnlineSnapshot();
     }
     render();
+    return true;
   }
 
   function gameTick() {
@@ -3312,6 +3445,18 @@
       )
       .join("");
 
+    const showOnlineRematchActions = Boolean(
+      state.online.enabled &&
+      state.online.roomCode &&
+      getOnlineHumanPlayers().length > 1
+    );
+    if (el.playAgainBtn) {
+      el.playAgainBtn.classList.toggle("hidden", !showOnlineRematchActions);
+    }
+    if (el.returnLobbyBtn) {
+      el.returnLobbyBtn.classList.toggle("hidden", !showOnlineRematchActions);
+    }
+    setEndModalButtonsBusy(false);
     el.endModal.classList.remove("hidden");
   }
 

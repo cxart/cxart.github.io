@@ -176,6 +176,34 @@ function setScreen(name) {
   });
 }
 
+function parseAutoJoinParams() {
+  const params = new URLSearchParams(window.location.search);
+  const roomCode = (params.get("room") || "").trim().toUpperCase();
+  const autoJoin = params.get("autojoin") === "1";
+  if (!roomCode || !autoJoin) {
+    return null;
+  }
+  return { roomCode };
+}
+
+async function maybeAutoJoinFromParams() {
+  const launch = parseAutoJoinParams();
+  if (!launch) {
+    return;
+  }
+  if (!db) {
+    showJoinError("Online room sync is unavailable.");
+    setScreen("join");
+    return;
+  }
+
+  el.joinCodeInput.value = launch.roomCode;
+  const joined = await joinRoom(launch.roomCode, { fromAutoLaunch: true });
+  if (!joined) {
+    setScreen("join");
+  }
+}
+
 // ── Room list (home screen) ───────────────────────────────────────────────────
 
 function watchRooms() {
@@ -290,20 +318,52 @@ async function createRoom() {
 
 // ── Join room ─────────────────────────────────────────────────────────────────
 
-async function joinRoom(code) {
-  if (!db) return;
+async function joinRoom(code, options = {}) {
+  if (!db) return false;
   code = code.toUpperCase().trim();
   const name = myName();
+  const fromAutoLaunch = Boolean(options.fromAutoLaunch);
   logLobby("joinRoom attempt", { code, playerId: MY_ID, name });
 
   showJoinError("");
 
   const snap = await get(ref(db, `nertz_rooms/${code}`));
-  if (!snap.exists()) { showJoinError("Room not found."); return; }
+  if (!snap.exists()) { showJoinError("Room not found."); return false; }
 
   const room = snap.val();
   logLobby("joinRoom room snapshot", summarizeRoom(room));
-  if (room.status !== "waiting") { showJoinError("That game has already started."); return; }
+  if (room.status !== "waiting") {
+    showJoinError(fromAutoLaunch ? "Waiting for host to reopen that room." : "That game has already started.");
+    return false;
+  }
+
+  const existingMe = room?.players?.[MY_ID];
+  if (existingMe) {
+    const maxPlayers = clampRoomSize(room.maxPlayers || MAX_ROOM_PLAYERS);
+    const existingSeat = Number(existingMe?.seat);
+    const seat = Number.isInteger(existingSeat) && existingSeat >= 0 && existingSeat < maxPlayers
+      ? existingSeat
+      : firstOpenHumanSeat(room, normalizeRoomPlayers(room));
+    if (seat < 0) {
+      showJoinError("Room is full.");
+      return false;
+    }
+
+    await update(ref(db, `nertz_rooms/${code}/players/${MY_ID}`), {
+      id: MY_ID,
+      seat,
+      name,
+      ready: false,
+      joinedAt: Number(existingMe?.joinedAt) || Date.now(),
+      cardBack: getCardBack(),
+      handicap: normalizeHandicap(existingMe?.handicap)
+    });
+    logLobby("joinRoom re-entered existing seat", { code, playerId: MY_ID, seat, name });
+
+    onDisconnect(ref(db, `nertz_rooms/${code}/players/${MY_ID}`)).remove();
+    enterRoom(code, room.hostId === MY_ID);
+    return true;
+  }
 
   const seatedPlayers = normalizeRoomPlayers(room);
   const seat = firstOpenHumanSeat(room, seatedPlayers);
@@ -315,7 +375,7 @@ async function joinRoom(code) {
       botSlots: Object.keys(getSanitizedBotSlots(room)).map((slot) => Number(slot)).sort((a, b) => a - b)
     });
     showJoinError("Room is full.");
-    return;
+    return false;
   }
 
   await update(ref(db, `nertz_rooms/${code}/players/${MY_ID}`), {
@@ -333,6 +393,7 @@ async function joinRoom(code) {
   onDisconnect(ref(db, `nertz_rooms/${code}/players/${MY_ID}`)).remove();
 
   enterRoom(code, false);
+  return true;
 }
 
 function showJoinError(msg) {
@@ -837,6 +898,7 @@ function init() {
 
   // Start watching rooms if Firebase is ready
   if (db) watchRooms();
+  void maybeAutoJoinFromParams();
 }
 
 init();

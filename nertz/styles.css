@@ -1032,6 +1032,16 @@ body.dragging-card .source-card {
   gap: 8px;
 }
 
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.modal-actions > button {
+  flex: 1 1 150px;
+}
+
 .score-row {
   display: grid;
   grid-template-columns: 1.2fr 1fr auto;

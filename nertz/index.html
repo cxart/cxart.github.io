@@ -136,7 +136,7 @@
       </section>
     </main>
 
-    <button id="force-reshuffle-btn" class="btn-secondary">
+    <button id="force-reshuffle-btn" class="btn-secondary" type="button">
       Rotate Draw Piles
     </button>
 
@@ -145,7 +145,11 @@
         <h2 id="end-title">Round Complete</h2>
         <p id="end-subtitle"></p>
         <div id="scoreboard"></div>
-        <button id="close-modal-btn" class="btn-primary">Close</button>
+        <div class="modal-actions">
+          <button id="play-again-btn" class="btn-primary hidden" type="button">Play Again</button>
+          <button id="return-lobby-btn" class="btn-secondary hidden" type="button">Return to Lobby</button>
+          <button id="close-modal-btn" class="btn-primary" type="button">Close</button>
+        </div>
       </div>
     </div>
 
