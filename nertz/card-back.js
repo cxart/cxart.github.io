@@ -10,7 +10,7 @@
     const encoded = encodeURIComponent(svg)
       .replace(/'/g, "%27")
       .replace(/"/g, "%22");
-    return `url("data:image/svg+xml,${encoded}")`;
+    return `url('data:image/svg+xml,${encoded}')`;
   }
 
   const PATTERNS = [
@@ -86,9 +86,9 @@
     { hex: "#0d3020", name: "Dark Forest" },
     { hex: "#1a3518", name: "Hunter Green" },
     { hex: "#5a2e0e", name: "Dark Copper" },
-    { hex: "#38180a", name: "Espresso" },
+    { hex: "#a8a8a8", name: "Light Grey" },
     { hex: "#252528", name: "Charcoal" },
-    { hex: "#3a2a10", name: "Dark Ochre" }
+    { hex: "#000000", name: "Black" }
   ];
 
   const SECONDARY_COLORS = [
@@ -102,8 +102,8 @@
     { hex: "#5865c0", name: "Periwinkle" },
     { hex: "#8845b0", name: "Violet" },
     { hex: "#b04080", name: "Rose" },
-    { hex: "#4878a8", name: "Steel Blue" },
-    { hex: "#c0601a", name: "Burnt Orange" }
+    { hex: "#909090", name: "Grey" },
+    { hex: "#c8c8c8", name: "White" }
   ];
 
   const STORAGE_KEY = "nertz_cardback";

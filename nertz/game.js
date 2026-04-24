@@ -34,9 +34,45 @@
   };
 
   const DIFFICULTY = {
-    easy: { minDelay: 1300, maxDelay: 2300, skill: 0.34, idleChance: 0.34 },
-    medium: { minDelay: 980, maxDelay: 1700, skill: 0.53, idleChance: 0.24 },
-    hard: { minDelay: 760, maxDelay: 1300, skill: 0.7, idleChance: 0.14 }
+    easy: {
+      minDelay: 1450,
+      maxDelay: 2600,
+      skill: 0.34,
+      idleChance: 0.34,
+      tableauCenterProbeChance: 0.74,
+      centerProbeChance: 0.64,
+      minGlobalGap: 260,
+      maxGlobalGap: 430,
+      thinkPauseChance: 0.34,
+      thinkPauseMin: 320,
+      thinkPauseMax: 880
+    },
+    medium: {
+      minDelay: 1180,
+      maxDelay: 1980,
+      skill: 0.53,
+      idleChance: 0.24,
+      tableauCenterProbeChance: 0.84,
+      centerProbeChance: 0.72,
+      minGlobalGap: 230,
+      maxGlobalGap: 390,
+      thinkPauseChance: 0.26,
+      thinkPauseMin: 260,
+      thinkPauseMax: 720
+    },
+    hard: {
+      minDelay: 930,
+      maxDelay: 1560,
+      skill: 0.7,
+      idleChance: 0.14,
+      tableauCenterProbeChance: 0.9,
+      centerProbeChance: 0.78,
+      minGlobalGap: 190,
+      maxGlobalGap: 330,
+      thinkPauseChance: 0.18,
+      thinkPauseMin: 200,
+      thinkPauseMax: 560
+    }
   };
   const BACK_PATTERNS = ["weave", "dots", "grid", "spiral", "hex", "diamond"];
   const BACK_PALETTES = [
@@ -104,7 +140,9 @@
     awaitingReady: false,
     readyByPlayerId: {},
     rotateConsents: {},
-    rotateProposed: false
+    rotateProposed: false,
+    nextGlobalBotActionAt: 0,
+    lastBotActionAt: 0
   };
 
   const el = {
@@ -1337,6 +1375,8 @@
     state.lastActivityAt = Date.now();
     state.rotateProposed = false;
     state.rotateConsents = {};
+    state.nextGlobalBotActionAt = 0;
+    state.lastBotActionAt = 0;
     state.dealAnimating = true;
     state.dealToken += 1;
     state.awaitingReady = false;
@@ -1444,11 +1484,12 @@
         currentChunk: [],
         wasteHistory: [],
         centerPlayed: 0,
+        lastActionAt: 0,
         dealVisible: {
           pileCounts: [0, 0, 0, 0],
           nertzVisual: 0
         },
-        nextActionAt: performance.now() + randomInt(160, 720)
+        nextActionAt: performance.now() + randomInt(280, 980)
       });
     }
 
@@ -1621,14 +1662,25 @@
         continue;
       }
 
+      if (now < (state.nextGlobalBotActionAt || 0)) {
+        break;
+      }
+
       if (now >= player.nextActionAt) {
-        const acted = botTakeAction(player);
+        const cfg = DIFFICULTY[player.difficulty] || DIFFICULTY.medium;
+        const executedMove = botTakeAction(player);
+        const acted = Boolean(executedMove);
         if (acted) {
           changed = true;
         }
-        const cfg = DIFFICULTY[player.difficulty] || DIFFICULTY.medium;
-        const delay = randomInt(cfg.minDelay, cfg.maxDelay);
-        player.nextActionAt = now + (acted ? delay : Math.floor(delay * 0.78));
+        player.lastActionAt = now;
+        player.nextActionAt = now + nextBotThinkDelay(cfg, acted, executedMove);
+
+        if (acted) {
+          state.lastBotActionAt = now;
+          state.nextGlobalBotActionAt = now + randomInt(cfg.minGlobalGap || 180, cfg.maxGlobalGap || 320);
+          break;
+        }
 
         if (!state.running) {
           break;
@@ -1649,17 +1701,20 @@
       return false;
     }
 
+    const cfg = DIFFICULTY[player.difficulty] || DIFFICULTY.medium;
     const moveChoices = collectBotMoves(player);
     if (!moveChoices.length) {
       return false;
     }
 
-    const chosen = chooseBotMove(player, moveChoices);
+    const centerFirst = pickCenterFirstBotMove(player, moveChoices, cfg);
+    const chosen = centerFirst || chooseBotMove(player, moveChoices, cfg);
     if (!chosen) {
       return false;
     }
 
-    return performBotMove(player, chosen);
+    const moved = performBotMove(player, chosen);
+    return moved ? chosen : null;
   }
 
   function performBotMove(player, move) {
@@ -1683,7 +1738,7 @@
       const toPoint = locateBotTargetPoint(player, move, movingCard);
       if (toPoint) {
         animateFlyingCard(movingCard, fromPoint, toPoint, {
-          duration: 280,
+          duration: randomInt(260, 390),
           small: true,
           ghostClass: "bot-move-ghost"
         });
@@ -1928,9 +1983,10 @@
 
     state.awaitingReady = false;
     const now = performance.now();
+    state.nextGlobalBotActionAt = now + randomInt(140, 320);
     for (const player of state.players) {
       if (!player.isHuman) {
-        player.nextActionAt = now + randomInt(180, 640);
+        player.nextActionAt = now + randomInt(260, 920);
       }
     }
     render();
@@ -1963,7 +2019,7 @@
     const encoded = encodeURIComponent(svg)
       .replace(/'/g, "%27")
       .replace(/"/g, "%22");
-    return `url("data:image/svg+xml,${encoded}")`;
+    return `url('data:image/svg+xml,${encoded}')`;
   }
 
   function patternToCss(pattern, color2) {
@@ -2139,14 +2195,14 @@
     if (wasteTop) {
       const centerTarget = findCenterTarget(wasteTop.card);
       if (centerTarget !== null) {
-        moves.push({ kind: "toCenter", source: { type: "waste" }, centerTarget, priority: 90 });
+        moves.push({ kind: "toCenter", source: { type: "waste", index: wasteTop.index }, centerTarget, priority: 90 });
       }
 
       for (let i = 0; i < player.tableau.length; i += 1) {
         const destPile = player.tableau[i];
         const destTop = destPile[destPile.length - 1];
         if (destTop && canStackOnTableau(wasteTop.card, destTop)) {
-          moves.push({ kind: "toTableau", source: { type: "waste" }, toPile: i, priority: 58 });
+          moves.push({ kind: "toTableau", source: { type: "waste", index: wasteTop.index }, toPile: i, priority: 58 });
         }
       }
     }
@@ -2242,26 +2298,309 @@
     return moves;
   }
 
-  function chooseBotMove(player, moves) {
-    const cfg = DIFFICULTY[player.difficulty] || DIFFICULTY.medium;
+  function chooseBotMove(player, moves, cfg = null) {
+    const config = cfg || DIFFICULTY[player.difficulty] || DIFFICULTY.medium;
 
-    if (Math.random() < cfg.idleChance) {
+    if (Math.random() < config.idleChance) {
       const drawMove = moves.find((m) => m.kind === "draw");
       if (drawMove) {
         return drawMove;
       }
     }
 
-    const ranked = moves.slice().sort((a, b) => b.priority - a.priority);
+    const ranked = rankBotMoves(player, moves);
+    if (!ranked.length) {
+      return null;
+    }
 
-    if (Math.random() < cfg.skill) {
-      const top = ranked[0].priority;
-      const window = cfg.skill > 0.65 ? 8 : 16;
-      const candidates = ranked.filter((move) => move.priority >= top - window);
+    if (Math.random() < config.skill) {
+      const top = ranked[0].score;
+      const window = config.skill > 0.65 ? 8 : 14;
+      const candidates = ranked
+        .filter((entry) => entry.score >= top - window)
+        .map((entry) => entry.move);
       return sample(candidates);
     }
 
-    return sample(ranked.slice(0, Math.min(9, ranked.length)));
+    return sample(ranked.slice(0, Math.min(9, ranked.length)).map((entry) => entry.move));
+  }
+
+  function pickCenterFirstBotMove(player, moves, cfg) {
+    const tableauCenterMoves = moves.filter((move) => move.kind === "toCenter" && move.source?.type === "tableau");
+    if (tableauCenterMoves.length && Math.random() < (cfg.tableauCenterProbeChance || 0)) {
+      return chooseFromBotMovePool(player, tableauCenterMoves, 7);
+    }
+
+    const centerMoves = moves.filter((move) => move.kind === "toCenter");
+    if (centerMoves.length && Math.random() < (cfg.centerProbeChance || 0)) {
+      return chooseFromBotMovePool(player, centerMoves, 7);
+    }
+
+    return null;
+  }
+
+  function chooseFromBotMovePool(player, moves, window) {
+    const ranked = rankBotMoves(player, moves);
+    if (!ranked.length) {
+      return null;
+    }
+    const top = ranked[0].score;
+    const candidates = ranked
+      .filter((entry) => entry.score >= top - window)
+      .map((entry) => entry.move);
+    return sample(candidates);
+  }
+
+  function rankBotMoves(player, moves) {
+    return moves
+      .map((move) => ({
+        move,
+        score: scoreBotMove(player, move)
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return (b.move.priority || 0) - (a.move.priority || 0);
+      });
+  }
+
+  function scoreBotMove(player, move) {
+    let score = Number(move.priority) || 0;
+    if (move.kind === "toCenter") {
+      if (move.source?.type === "tableau") score += 16;
+      if (move.source?.type === "nertz") score += 8;
+      return score;
+    }
+
+    if (move.kind === "toTableau") {
+      const card = resolveMoveLeadCard(player, move);
+      score += scoreTableauCommitment(player, move, card);
+      return score;
+    }
+
+    if (move.kind === "draw") {
+      const future = estimateFutureDrawPlayOptions(player, 18);
+      if (future.centerPlayable > 0) {
+        score += 5;
+      } else if (future.totalPlayable === 0) {
+        score += 2;
+      }
+    }
+
+    return score;
+  }
+
+  function scoreTableauCommitment(player, move, card) {
+    if (!card || move.kind !== "toTableau") {
+      return 0;
+    }
+
+    let delta = 0;
+    const destination = player.tableau[move.toPile] || [];
+    const destIsEmpty = destination.length === 0;
+    const immediateCombine = isImmediatePileCombineMove(player, move);
+    const followupCombine = enablesFollowupPileCombine(player, move, card);
+
+    if (immediateCombine) delta += 18;
+    if (followupCombine) delta += 13;
+
+    if (move.source?.type === "waste") {
+      const lowCardPenalty = card.rank <= 3 ? 20 : card.rank <= 5 ? 14 : card.rank <= 7 ? 9 : card.rank <= 9 ? 4 : 0;
+      if (lowCardPenalty > 0) {
+        const distance = Number.isInteger(move.source.index) ? drawDistanceForSlot(player, move.source.index) : Number.POSITIVE_INFINITY;
+        const earlyInDeck = Number.isFinite(distance) && distance <= 6;
+        const future = estimateFutureDrawPlayOptions(player, 21);
+        const scarceFutureOptions = future.totalPlayable <= 2;
+
+        if (earlyInDeck && scarceFutureOptions) {
+          delta += 7;
+        } else {
+          delta -= lowCardPenalty;
+        }
+
+        if (destIsEmpty && card.rank <= 6) {
+          delta -= 7;
+        }
+      }
+    }
+
+    if (move.source?.type === "tableau") {
+      const sourcePile = player.tableau[move.source.pile] || [];
+      const startIndex = Number.isInteger(move.source.index) ? move.source.index : Math.max(0, sourcePile.length - 1);
+      const uncoversFaceDown = startIndex > 0 && sourcePile[startIndex - 1] && !sourcePile[startIndex - 1].faceUp;
+      if (uncoversFaceDown) {
+        delta += 10;
+      } else if (!immediateCombine && !followupCombine) {
+        delta -= 6;
+      }
+    }
+
+    return delta;
+  }
+
+  function resolveMoveLeadCard(player, move) {
+    const source = move?.source;
+    if (!source) {
+      return null;
+    }
+
+    if (source.type === "nertz") {
+      return topNertzCard(player);
+    }
+
+    if (source.type === "waste") {
+      if (Number.isInteger(source.index)) {
+        return player.handSlots[source.index] || null;
+      }
+      return getWasteTop(player)?.card || null;
+    }
+
+    if (source.type === "tableau") {
+      const pile = player.tableau[source.pile] || [];
+      const index = Number.isInteger(source.index) ? source.index : pile.length - 1;
+      return pile[index] || null;
+    }
+
+    return null;
+  }
+
+  function orderedHandIndicesFromCursor(player) {
+    const slots = Array.isArray(player?.handSlots) ? player.handSlots : [];
+    if (!slots.length) {
+      return [];
+    }
+
+    const cursorRaw = Number(player.drawCursor) || 0;
+    const cursor = ((cursorRaw % slots.length) + slots.length) % slots.length;
+    const ordered = [];
+    for (let i = cursor; i < slots.length; i += 1) {
+      if (slots[i]) {
+        ordered.push(i);
+      }
+    }
+    for (let i = 0; i < cursor; i += 1) {
+      if (slots[i]) {
+        ordered.push(i);
+      }
+    }
+    return ordered;
+  }
+
+  function drawDistanceForSlot(player, slotIndex) {
+    if (!Number.isInteger(slotIndex)) {
+      return Number.POSITIVE_INFINITY;
+    }
+    const ordered = orderedHandIndicesFromCursor(player);
+    const pos = ordered.indexOf(slotIndex);
+    return pos >= 0 ? pos : Number.POSITIVE_INFINITY;
+  }
+
+  function estimateFutureDrawPlayOptions(player, lookahead = 18) {
+    const ordered = orderedHandIndicesFromCursor(player);
+    const limit = Math.max(0, Math.min(ordered.length, lookahead));
+    let centerPlayable = 0;
+    let tableauPlayable = 0;
+
+    for (let i = 0; i < limit; i += 1) {
+      const card = player.handSlots[ordered[i]];
+      if (!card) {
+        continue;
+      }
+      if (findCenterTarget(card) !== null) {
+        centerPlayable += 1;
+      } else if (canCardStackToOwnTableau(card, player.tableau)) {
+        tableauPlayable += 1;
+      }
+    }
+
+    return {
+      centerPlayable,
+      tableauPlayable,
+      totalPlayable: centerPlayable + tableauPlayable
+    };
+  }
+
+  function canCardStackToOwnTableau(card, tableau) {
+    for (const pile of tableau || []) {
+      if (!pile.length) {
+        continue;
+      }
+      const top = pile[pile.length - 1];
+      if (top && canStackOnTableau(card, top)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function isImmediatePileCombineMove(player, move) {
+    if (move.kind !== "toTableau" || move.source?.type !== "tableau") {
+      return false;
+    }
+    const sourcePile = player.tableau[move.source.pile] || [];
+    const startIndex = Number.isInteger(move.source.index) ? move.source.index : sourcePile.length - 1;
+    if (startIndex !== 0) {
+      return false;
+    }
+    const destination = player.tableau[move.toPile] || [];
+    return destination.length > 0 && sourcePile.length > 0;
+  }
+
+  function enablesFollowupPileCombine(player, move, movedCard) {
+    if (move.kind !== "toTableau" || !movedCard) {
+      return false;
+    }
+
+    let newDestTop = movedCard;
+    if (move.source?.type === "tableau") {
+      const sourcePile = player.tableau[move.source.pile] || [];
+      const startIndex = Number.isInteger(move.source.index) ? move.source.index : sourcePile.length - 1;
+      const movedRun = sourcePile.slice(startIndex);
+      if (movedRun.length) {
+        newDestTop = movedRun[movedRun.length - 1];
+      }
+    }
+    if (!newDestTop) {
+      return false;
+    }
+
+    for (let src = 0; src < player.tableau.length; src += 1) {
+      if (src === move.toPile || src === move.source?.pile) {
+        continue;
+      }
+      const pile = player.tableau[src] || [];
+      if (!pile.length) {
+        continue;
+      }
+      if (!pile[0].faceUp || !isValidFaceUpRun(pile, 0)) {
+        continue;
+      }
+      if (canStackOnTableau(pile[0], newDestTop)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function nextBotThinkDelay(cfg, acted, move) {
+    let delay = randomInt(cfg.minDelay || 900, cfg.maxDelay || 1600);
+    if (!acted) {
+      return Math.max(380, Math.floor(delay * 0.86));
+    }
+
+    if (move?.kind === "toCenter") {
+      delay += randomInt(90, 210);
+    } else if (move?.kind === "toTableau" && move?.source?.type === "tableau") {
+      delay += randomInt(70, 170);
+    }
+
+    if (Math.random() < (cfg.thinkPauseChance || 0)) {
+      delay += randomInt(cfg.thinkPauseMin || 180, cfg.thinkPauseMax || 520);
+    }
+
+    return delay;
   }
 
   function applyMove(player, move, isBot = false) {
@@ -2329,10 +2668,8 @@
     addLog(`<strong>${player.name}</strong> played ${formatCard(card)} to center.`);
 
     if (card.rank === 13 && placedPileIndex >= 0) {
-      const completedSlot = state.centerPileSlots[placedPileIndex];
       state.centerPiles.splice(placedPileIndex, 1);
       state.centerPileSlots.splice(placedPileIndex, 1);
-      state.completedCenterSlots.add(completedSlot);
       addLog(`<strong>${player.name}</strong> completed a center pile with ${formatCard(card)}.`);
     }
 
@@ -2661,13 +2998,15 @@
   }
 
   function getCenterColumnCount() {
-    const preferred = state.players.length >= 4 ? 5 : CENTER_SLOT_COLUMNS;
-    return Math.max(1, Math.min(preferred, getResponsiveCenterMaxColumns()));
+    if (state.players.length >= 4) {
+      return CENTER_SLOT_COLUMNS;
+    }
+    return Math.max(1, Math.min(CENTER_SLOT_COLUMNS, getResponsiveCenterMaxColumns()));
   }
 
   function getCenterSlotCount() {
     const columns = getCenterColumnCount();
-    const baseSlots = state.players.length >= 4 ? columns * 2 : columns;
+    const baseSlots = state.players.length >= 4 ? CENTER_SLOT_COLUMNS * 2 : columns;
     const mappedMax = state.centerPileSlots.length ? Math.max(...state.centerPileSlots) : -1;
     let count = Math.max(Math.max(BASE_CENTER_SLOT_COUNT, baseSlots), mappedMax + 1);
     const occupied = getOccupiedCenterSlotSet().size;
@@ -3839,9 +4178,6 @@
     el.centerPiles.style.gridTemplateColumns = `repeat(${columns}, minmax(var(--card-w), 1fr))`;
     const slots = [];
     for (let slot = 0; slot < slotCount; slot += 1) {
-      if (state.completedCenterSlots.has(slot)) {
-        continue;
-      }
       const pileIdx = centerPileIndexBySlot(slot);
       if (pileIdx >= 0) {
         const pile = state.centerPiles[pileIdx];
@@ -4066,7 +4402,7 @@
     const sizeClass = options.small ? " small" : "";
 
     if (!faceUp) {
-      const style = options.backStyle ? ` style="${options.backStyle}"` : "";
+      const style = options.backStyle ? ` style="${escapeHtml(options.backStyle)}"` : "";
       return `<div class="card face-down${sizeClass}"${style}></div>`;
     }
 
