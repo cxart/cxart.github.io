@@ -2,6 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="0; url=index.html" />
+    <title>Nertz Online</title>
+  </head>
+  <body>
+    <p>Online play is temporarily unavailable. <a href="index.html">Play single-player instead.</a></p>
+    <script>window.location.replace("index.html");</script>
+  </body>
+</html>
+
+<!--
+  MULTIPLAYER DISABLED: Firebase Realtime Database security rules expired (May 2026).
+  To restore: update rules in Firebase console, restore the original lobby.html content
+  below, and re-add the "Play Online" link in index.html.
+
+  ============================================================
+  ORIGINAL LOBBY.HTML CONTENT BELOW — DO NOT DELETE
+  ============================================================
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -450,7 +472,7 @@
           <h1 style="margin:0">Nertz <span style="color:var(--accent)">Online</span></h1>
         </div>
         <div class="hero-links">
-          <a class="home-link" href="index.html">Single Player →</a>
+          <a class="home-link" href="index.html">Single Player &rarr;</a>
         </div>
       </header>
 
@@ -472,14 +494,14 @@
           </div>
           <div class="action-row">
             <button id="create-btn" class="btn-primary">+ Create Room</button>
-            <button id="join-btn" class="btn-secondary">Join by Code →</button>
+            <button id="join-btn" class="btn-secondary">Join by Code &rarr;</button>
           </div>
         </section>
 
         <section class="lobby-panel">
           <h2>Open Rooms</h2>
           <div id="room-list">
-            <p class="room-list-empty">Looking for rooms…</p>
+            <p class="room-list-empty">Looking for rooms&hellip;</p>
           </div>
         </section>
 
@@ -495,7 +517,7 @@
             <button id="join-code-btn" class="btn-primary">Join</button>
           </div>
           <p id="join-error" class="error-text hidden"></p>
-          <button id="join-cancel-btn" class="btn-inline">← Back</button>
+          <button id="join-cancel-btn" class="btn-inline">&larr; Back</button>
         </section>
 
       </div><!-- /screen-join -->
@@ -542,7 +564,7 @@
 
           <div class="room-actions">
             <button id="ready-btn" class="btn-secondary">I'm Ready</button>
-            <button id="start-game-btn" class="btn-primary hidden">Start Game ▶</button>
+            <button id="start-game-btn" class="btn-primary hidden">Start Game &#9654;</button>
             <button id="leave-room-btn" class="btn-inline">Leave</button>
           </div>
         </section>
@@ -557,3 +579,5 @@
     </script>
   </body>
 </html>
+
+-->
