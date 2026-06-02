@@ -1,0 +1,5 @@
+.DS_Store
+.claude/
+
+# Private local-only files that should not appear in the public Pages repo.
+amanda-simulator/
