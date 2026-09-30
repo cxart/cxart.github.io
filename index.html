@@ -41,30 +41,34 @@
             localStorage.setItem('accentColor', colors[currentColorIndex]);
         }
 
-        function showTools() {
-            document.getElementById('home-content').style.display = 'none';
-            document.getElementById('tools-content').style.display = 'block';
-            document.getElementById('header-title').textContent = 'tools';
-            document.getElementById('header-subtitle').textContent = 'a few research utilities';
-            document.getElementById('nav-home').style.display = 'none';
-            document.getElementById('nav-tools').style.display = 'inline';
-            document.title = 'carter allen | tools';
+        const views = {
+            home:  { id: 'home-content',  title: 'carter allen', subtitle: 'carterallen [at] berkeley [dot] edu', page: 'home' },
+            pubs:  { id: 'pubs-content',  title: 'publications', subtitle: 'papers and working papers',          page: 'publications' },
+            tools: { id: 'tools-content', title: 'tools',        subtitle: 'a few research utilities',            page: 'tools' }
+        };
+
+        function showView(name) {
+            for (const key in views) {
+                document.getElementById(views[key].id).style.display = (key === name) ? 'block' : 'none';
+            }
+            const view = views[name];
+            document.getElementById('header-title').textContent = view.title;
+            document.getElementById('header-subtitle').textContent = view.subtitle;
+            document.getElementById('nav-home').style.display = (name === 'home') ? 'inline' : 'none';
+            document.getElementById('nav-back').style.display = (name === 'home') ? 'none' : 'inline';
+            document.title = 'carter allen | ' + view.page;
             applyAccentColor();
+        }
+
+        function showHome() { showView('home'); }
+        function showPubs() { showView('pubs'); }
+
+        function showTools() {
+            showView('tools');
             // Generate initial EA org name if empty
             if (!document.getElementById('generatedName').textContent) {
                 generateOne();
             }
-        }
-
-        function showHome() {
-            document.getElementById('tools-content').style.display = 'none';
-            document.getElementById('home-content').style.display = 'block';
-            document.getElementById('header-title').textContent = 'carter allen';
-            document.getElementById('header-subtitle').textContent = 'carterallen [at] berkeley [dot] edu';
-            document.getElementById('nav-tools').style.display = 'none';
-            document.getElementById('nav-home').style.display = 'inline';
-            document.title = 'carter allen | home';
-            applyAccentColor();
         }
     </script>
 
@@ -142,7 +146,7 @@
         }
 
         nav {
-            margin-top: 12px;
+            margin-top: 28px;
             margin-bottom: 20px;
             text-align: center;
         }
@@ -157,7 +161,7 @@
             line-height: 1.2;
         }
 
-        #content {
+        #content, #pubs-inner {
             max-width: 720px;
             width: 100%;
             padding: 0 20px;
@@ -166,6 +170,67 @@
             font-size: 1rem;
             font-weight: 400;
             box-sizing: border-box;
+        }
+
+        .profile-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .profile-links a {
+            border-bottom: none;
+            font-size: 1rem;
+            opacity: 0.5;
+        }
+
+        .profile-links a:hover {
+            border-bottom: none;
+            opacity: 0.9;
+        }
+
+        .section-heading {
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            font-weight: normal;
+            font-size: 1.3rem;
+            margin: 40px 0 5px 0;
+            color: var(--accent-color);
+        }
+
+        #pubs-inner {
+            max-width: 760px;
+        }
+
+        .pubs-intro {
+            color: var(--secondary-text);
+            font-size: 0.95rem;
+            margin: 10px 0 0 0;
+        }
+
+        .pubs {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .pubs li {
+            margin: 14px 0;
+        }
+
+        .pub-meta {
+            display: block;
+            color: var(--secondary-text);
+            font-size: 0.9rem;
+        }
+
+        .pub-meta .me {
+            color: var(--text-color);
+            font-weight: 600;
+        }
+
+        .pub-status {
+            font-style: italic;
         }
 
         .refresh-text {
@@ -288,7 +353,7 @@
 
         /* For very small screens, like smartphones */
         @media (max-width: 480px) {
-            #content, #tools-content {
+            #content, #pubs-inner, #tools-content {
                 padding: 0 10px;
             }
 
@@ -328,10 +393,10 @@
     <nav>
         <span id="nav-home">
             <a href="Allen_CV_July_2026.pdf" target="_blank" rel="noopener noreferrer">CV</a>
+            <button type="button" class="link-button nav-toggle" onclick="showPubs()">publications</button>
             <button type="button" class="link-button nav-toggle" onclick="showTools()">miscellaneous tools</button>
-            <a href="nertz/index.html">nertz</a>
         </span>
-        <span id="nav-tools" style="display: none;">
+        <span id="nav-back" style="display: none;">
             <button type="button" class="link-button nav-toggle" onclick="showHome()">&larr; back to home</button>
         </span>
     </nav>
@@ -340,8 +405,8 @@
     <div id="home-content">
         <div id="content">
             <p>
-                Hi, I'm Carter! I'm a second-year PhD student at UC Berkeley.
-                I research judgment and decision-making under uncertainty, with a focus on forecasting and AI.
+                Hi, I'm Carter! I'm a third-year PhD student at UC Berkeley.
+                I research judgment and decision-making under uncertainty, with a focus on forecasting and human-AI interaction.
                 I also work part-time at the <a href="https://forecastingresearch.org/" target="_blank" rel="noopener noreferrer">Forecasting Research Institute</a>.
                 Previously, I did research at <a href="https://eapsychology.org/" target="_blank" rel="noopener noreferrer">NYU</a>, the
                 <a href="https://globalprioritiesinstitute.org/" target="_blank" rel="noopener noreferrer">Global Priorities Institute</a>, and
@@ -363,8 +428,96 @@
             </p>
 
             <div class="footer">
-                Carter Allen, 2026
+                <div class="profile-links">
+                    <a href="https://github.com/cxart" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
+                    <a href="https://x.com/atcarterallen" target="_blank" rel="noopener noreferrer" aria-label="Twitter" title="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="https://www.linkedin.com/in/atcarterallen" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" title="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                </div>
                 <div class="refresh-text">Refresh this page for a different picture of me!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Publications Content -->
+    <div id="pubs-content" style="display: none;">
+        <div id="pubs-inner">
+            <p class="pubs-intro">
+                My research has focused on human judgment and decision-making, especially related to (a) probability estimation and (b) moral concern.
+                For anything without a link, feel free to email me for a draft.
+            </p>
+                <h3 class="section-heading">Judgment and decision-making</h3>
+                <ol class="pubs">
+                    <li>
+                        <span class="pub-title">Does dialectical bootstrapping improve the wisdom of the inner crowd?</span>
+                        <span class="pub-meta"><span class="me">Allen, C.</span>, Gaertig, C., &amp; Simmons, J. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                    <li>
+                        <a href="https://doi.org/10.1037/xge0001924" target="_blank" rel="noopener noreferrer" class="pub-title">Does one person make a difference? Many&ndash;one effects in judgments of prosocial action</a>
+                        <span class="pub-meta">Lewis, J., Srna, S., Salu, J., <span class="me">Allen, C.</span> &hellip; Caviola, L. <span class="pub-status"><i>Journal of Experimental Psychology: General</i>, 2026.</span></span>
+                    </li>
+                    <li>
+                        <a href="https://osf.io/preprints/psyarxiv/t8eb2" target="_blank" rel="noopener noreferrer" class="pub-title">It only takes one: The psychology of unilateral decisions</a>
+                        <span class="pub-meta">Lewis, J., <span class="me">Allen, C.</span>, Winter, C., &amp; Caviola, L. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                </ol>
+
+                <h3 class="section-heading">Moral status of AI</h3>
+                <ol class="pubs">                    <li>
+                        <a href="https://osf.io/preprints/psyarxiv/38a6j" target="_blank" rel="noopener noreferrer" class="pub-title">Moral concern for AI</a>
+                        <span class="pub-meta"><span class="me">Allen, C.</span> &amp; Caviola, L. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                    <li>
+                        <a href="https://arxiv.org/abs/2506.11945" target="_blank" rel="noopener noreferrer" class="pub-title">Subjective experience in AI systems: What do AI researchers and the public believe?</a>
+                        <span class="pub-meta">Dreksler, N., Caviola, L., <span class="me">Allen, C.</span>, Lewis, J., &hellip; Chalmers, D. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                    <li>
+                        <span class="pub-title">Inter-AI morality: How AI systems treat one another</span>
+                        <span class="pub-meta">Caviola, L., Kaiser, C., <span class="me">Allen, C.</span>, &amp; Sebo, J. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                </ol>
+
+                <h3 class="section-heading">Moral concern and prosociality</h3>
+                <ol class="pubs">
+                    <li>
+                        <a href="https://doi.org/10.1177/01461672251373108" target="_blank" rel="noopener noreferrer" class="pub-title">Becoming speciesist: How children and adults differ in valuing animals by species and cognitive capacity</a>
+                        <span class="pub-meta">Caviola, L., Wilks, M., Su&aacute;rez-Yera, C., <span class="me">Allen, C.</span> &hellip; Bloom, P. <span class="pub-status"><i>Personality and Social Psychology Bulletin</i>, 2025.</span></span>
+                    </li>
+                    <li>
+                        <a href="https://osf.io/preprints/psyarxiv/6cyn4_v2" target="_blank" rel="noopener noreferrer" class="pub-title">Increasing the effectiveness of charitable giving using human-AI dialogues</a>
+                        <span class="pub-meta">White, J.P., <span class="me">Allen, C.</span>, Caviola, L., Costello, T., &amp; Rand, D. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                    <li>
+                        <span class="pub-title">Saving people or pets? Speciesism and family partiality across development</span>
+                        <span class="pub-meta">Wilks, M., Caviola, L., Rottman, J., <span class="me">Allen, C.</span> &hellip; Bloom, P. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                    <li>
+                        <span class="pub-title">Using human-AI dialogues for moral persuasion</span>
+                        <span class="pub-meta">White, J.P., <span class="me">Allen, C.</span>, Caviola, L., &amp; Rand, D. <span class="pub-status">Working paper.</span></span>
+                    </li>
+                </ol>
+
+                <h3 class="section-heading">Other writing</h3>
+                <ul class="pubs">
+                    <li>
+                        <a href="https://globalprioritiesinstitute.org/wp-content/uploads/GPI-Psychology-and-Behavioral-Science-Research-Agenda-Version-1-November-2024.pdf" target="_blank" rel="noopener noreferrer" class="pub-title">The Global Priorities Institute psychology and behavioral science research agenda</a>
+                        <span class="pub-meta">Caviola, L., Lewis, J., Wilks, M., Novick Hoskin, A., Schubert, S., <span class="me">Allen, C.</span>, &amp; Salu, J. <span class="pub-status">2024.</span></span>
+                    </li>
+                    <li>
+                        <a href="https://forum.effectivealtruism.org/posts/cuSYBsgXTji7yN3cg/increasing-concern-for-digital-beings-through-llm-persuasion" target="_blank" rel="noopener noreferrer" class="pub-title">Increasing concern for digital beings through LLM persuasion</a>
+                        <span class="pub-meta"><span class="me">Allen, C.</span> &amp; Caviola, L. <span class="pub-status">2024.</span></span>
+                    </li>
+                    <li>
+                        <a href="https://forum.effectivealtruism.org/posts/hLdYZvQxJPSPF9hui/a-research-agenda-for-psychology-and-ai" target="_blank" rel="noopener noreferrer" class="pub-title">A research agenda for psychology and AI</a>
+                        <span class="pub-meta"><span class="me">Allen, C.</span> <span class="pub-status">2024.</span></span>
+                    </li>
+                </ul>
+
+            <div class="footer">
+                <div class="profile-links">
+                    <a href="https://github.com/cxart" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
+                    <a href="https://x.com/atcarterallen" target="_blank" rel="noopener noreferrer" aria-label="Twitter" title="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="https://www.linkedin.com/in/atcarterallen" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" title="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                </div>
             </div>
         </div>
     </div>
@@ -423,7 +576,11 @@
         </div>
 
         <div class="footer">
-            Carter Allen, 2026
+            <div class="profile-links">
+                <a href="https://github.com/cxart" target="_blank" rel="noopener noreferrer" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
+                <a href="https://x.com/atcarterallen" target="_blank" rel="noopener noreferrer" aria-label="Twitter" title="Twitter"><i class="fab fa-twitter"></i></a>
+                <a href="https://www.linkedin.com/in/atcarterallen" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" title="LinkedIn"><i class="fab fa-linkedin"></i></a>
+            </div>
         </div>
     </div>
 
