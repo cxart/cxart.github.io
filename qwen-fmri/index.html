@@ -131,9 +131,11 @@ let CFG = null, DATA = null, MSGS = [], HOV = null, NEAR = null, PIN = null, BUS
 // modes: "local" = served by fmri_app.py; on a static host: "live" = talking to the local app at LIVE, else "saved"
 let MODE = "local", BASE = "", SAVED = false;
 const LIVE = "http://localhost:8770";
-let PREF = {on: null, cat: {}, closed: {}, token: "", light: false, spark: false};
+let PREF = {on: null, closed: {}, token: "", light: false, spark: false};
 try { Object.assign(PREF, JSON.parse(localStorage.getItem("fmri_prefs") || "{}")); } catch (e) {}
+delete PREF.cat;   // categories are fixed (Carter 2026-11-02); drop old saved overrides
 const save = () => { try { localStorage.setItem("fmri_prefs", JSON.stringify(PREF)); } catch (e) {} };
+save();
 const theme = () => document.documentElement.setAttribute("data-theme", PREF.light ? "light" : "dark");
 theme();
 if (PREF.split) $("#app").style.gridTemplateColumns = `minmax(0, ${PREF.split}fr) 6px minmax(0, ${100 - PREF.split}fr)`;
@@ -158,7 +160,7 @@ async function api(path, body) {
   return j;
 }
 const meterOn = () => PREF.on || CFG.default_on;
-const catOf = m => PREF.cat[m.name] || m.cat;
+const catOf = m => m.cat;
 const shown = () => CFG.meters.filter(m => m.status === "ok" && meterOn().includes(m.name) && (!SAVED || (DATA && DATA.meters[m.name])));
 
 async function tryJSON(url, opts) {
@@ -462,18 +464,14 @@ function renderPop() {
     if (!inC.length) continue;
     h += `<h3>${esc(c)}</h3>` + inC.map(m => `<div class="pm${m.status === "ok" ? "" : " na"}">
       <input type="checkbox" data-n="${m.name}" ${on.includes(m.name) ? "checked" : ""} ${m.status === "ok" ? "" : "disabled"}>
-      <span>${esc(m.label)}${m.status === "ok" ? "" : ` <i>(${esc(m.note)})</i>`}${SAVED && m.status === "ok" && !(DATA && DATA.meters[m.name]) ? " <i>(not in this saved chat)</i>" : ""}</span>
-      <select data-c="${m.name}">${CFG.categories.map(x => `<option${x === c ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></div>`).join("");
+      <span>${esc(m.label)}${m.status === "ok" ? "" : ` <i>(${esc(m.note)})</i>`}${SAVED && m.status === "ok" && !(DATA && DATA.meters[m.name]) ? " <i>(not in this saved chat)</i>" : ""}</span></div>`).join("");
   }
   $("#popin").innerHTML = h;
   $("#pclose").onclick = closePop;
-  $("#preset").onclick = () => { PREF.on = null; PREF.cat = {}; save(); POPDIRTY = true; renderPop(); renderPanel(); };
+  $("#preset").onclick = () => { PREF.on = null; save(); POPDIRTY = true; renderPop(); renderPanel(); };
   $("#popin").querySelectorAll("input[data-n]").forEach(x => x.onchange = () => {
     const s = new Set(meterOn()); x.checked ? s.add(x.dataset.n) : s.delete(x.dataset.n);
     PREF.on = [...s]; save(); POPDIRTY = true; renderPanel();
-  });
-  $("#popin").querySelectorAll("select[data-c]").forEach(x => x.onchange = () => {
-    PREF.cat[x.dataset.c] = x.value; save(); renderPop(); renderPanel();
   });
 }
 init().catch(e => { $("#status").textContent = "error: " + e.message; });
