@@ -25,8 +25,10 @@ body { background: var(--bg); color: var(--fg); font: 14px/1.45 "IBM Plex Sans",
 button, select, input, textarea { font: inherit; color: var(--fg); background: var(--soft); border: 1px solid var(--line); border-radius: 6px; }
 button { padding: 4px 10px; cursor: pointer; }
 button:hover { border-color: var(--muted); }
-#app { display: grid; grid-template-columns: 7fr 3fr; height: 100vh; }
-#left { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--line); }
+#app { display: grid; grid-template-columns: minmax(0, 58fr) 6px minmax(0, 42fr); height: 100vh; }
+#div { cursor: col-resize; background: var(--line); }
+#div:hover, #div.drag { background: var(--muted); }
+#left { display: flex; flex-direction: column; min-width: 0; }
 #top { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 #top h1 { font-size: 15px; margin: 0 6px 0 0; font-weight: 600; }
 #backend { font-size: 12px; color: var(--muted); }
@@ -51,7 +53,7 @@ button:hover { border-color: var(--muted); }
 #form { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
 #msg { flex: 1; resize: none; height: 54px; padding: 8px; background: var(--panel); }
 #status { font-size: 12px; color: var(--muted); padding: 0 16px 6px; min-height: 18px; }
-#right { overflow-y: auto; background: var(--panel); padding: 8px 12px 30px; }
+#right { overflow-y: auto; overflow-x: hidden; background: var(--panel); padding: 8px 12px 30px; min-width: 0; overflow-wrap: anywhere; }
 #tokhead { position: sticky; top: -8px; background: var(--panel); padding: 6px 0 6px; border-bottom: 1px solid var(--line); z-index: 2; }
 #tokhead .t { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; background: rgba(var(--hover), .35); padding: 1px 5px; border-radius: 3px; }
 #tokhead .r { font-size: 12px; color: var(--muted); margin-left: 6px; }
@@ -59,19 +61,19 @@ button:hover { border-color: var(--muted); }
 .sec { margin-top: 8px; }
 .sec > .h { display: flex; justify-content: space-between; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 3px 0; border-bottom: 1px solid var(--line); user-select: none; }
 .sec.closed > .b { display: none; }
-.m { padding: 3px 0 1px; max-width: 380px; }
-.m .row1 { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; line-height: 1.25; }
-.m .lab { white-space: nowrap; }
-.m .ends { flex: 1; text-align: right; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m { padding: 3px 0 1px; }
+.m .row1 { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; font-size: 12.5px; line-height: 1.25; }
+.m .lab { }
+.m .ends { flex: 1 1 auto; text-align: right; font-size: 10.5px; color: var(--muted); }
 .m .val { font-variant-numeric: tabular-nums; font-size: 11.5px; min-width: 34px; text-align: right; }
 .bar { position: relative; height: 7px; border-radius: 4px; margin-top: 2px; background: var(--track); }
 .bar .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
 .bar .f { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
 .spark { display: block; width: 100%; height: 18px; margin-top: 1px; }
-#bm { overflow-x: auto; }
+#bm { }
 #bm table { border-collapse: separate; border-spacing: 1px; margin: 5px 0 2px; width: 100%; table-layout: auto; }
-#bm td { min-width: 12px; height: 11px; padding: 0; border-radius: 1px; }
-#bm td.lab { width: 1%; min-width: 0; font-size: 10px; color: var(--muted); padding-right: 5px; white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+#bm td { min-width: 8px; height: 11px; padding: 0; border-radius: 1px; }
+#bm td.lab { width: 1%; min-width: 96px; max-width: 130px; font-size: 10px; line-height: 1.15; color: var(--muted); padding-right: 5px; white-space: normal; }
 #bm th { font-size: 9px; font-weight: 400; color: var(--muted); padding: 0; text-align: center; }
 #bm td.own { outline: 1.5px solid var(--fg); outline-offset: -1px; }
 .legend { font-size: 10.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -88,7 +90,7 @@ button:hover { border-color: var(--muted); }
 #popin .pm span { flex: 1; }
 #popin .pm.na { color: var(--muted); }
 #popin select { font-size: 12px; }
-@media (max-width: 800px) { #app { grid-template-columns: 1fr; grid-template-rows: 60vh auto; height: auto; } #right { border-top: 1px solid var(--line); } }
+@media (max-width: 800px) { #app { grid-template-columns: 1fr !important; grid-template-rows: 60vh auto; height: auto; } #div { display: none; } #right { border-top: 1px solid var(--line); } }
 </style>
 </head>
 <body>
@@ -115,6 +117,7 @@ button:hover { border-color: var(--muted); }
     <div id="status"></div>
     <div id="form"><textarea id="msg"></textarea><button id="send">Send</button></div>
   </div>
+  <div id="div" title="drag to resize"></div>
   <div id="right">
     <div id="tokhead"><span class="empty">hover over a word</span></div>
     <div id="panel"></div>
@@ -133,6 +136,16 @@ try { Object.assign(PREF, JSON.parse(localStorage.getItem("fmri_prefs") || "{}")
 const save = () => { try { localStorage.setItem("fmri_prefs", JSON.stringify(PREF)); } catch (e) {} };
 const theme = () => document.documentElement.setAttribute("data-theme", PREF.light ? "light" : "dark");
 theme();
+if (PREF.split) $("#app").style.gridTemplateColumns = `minmax(0, ${PREF.split}fr) 6px minmax(0, ${100 - PREF.split}fr)`;
+$("#div").addEventListener("mousedown", e => {
+  e.preventDefault(); $("#div").classList.add("drag");
+  const move = ev => {
+    PREF.split = Math.max(35, Math.min(75, ev.clientX / window.innerWidth * 100));
+    $("#app").style.gridTemplateColumns = `minmax(0, ${PREF.split}fr) 6px minmax(0, ${100 - PREF.split}fr)`;
+  };
+  const up = () => { $("#div").classList.remove("drag"); save(); removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
+  addEventListener("mousemove", move); addEventListener("mouseup", up);
+});
 $("#light").checked = !!PREF.light; $("#sparkon").checked = !!PREF.spark;
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
