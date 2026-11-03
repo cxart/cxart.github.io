@@ -59,6 +59,7 @@ button:hover { border-color: var(--muted); }
 #tokhead .t { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; background: rgba(var(--hover), .35); padding: 1px 5px; border-radius: 3px; }
 #tokhead .r { font-size: 12px; color: var(--muted); margin-left: 6px; }
 #tokhead .nx { font-size: 12px; color: var(--muted); margin-top: 2px; }
+#tokhead .nx .ch { color: var(--fg); font-weight: 600; background: rgba(var(--hover), .22); padding: 0 4px; border-radius: 3px; }
 .sec { margin-top: 8px; }
 .sec > .h { display: flex; justify-content: space-between; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .05em; padding: 3px 0; border-bottom: 1px solid var(--line); user-select: none; }
 .sec.closed > .b { display: none; }
@@ -356,6 +357,18 @@ function selection() {
 }
 const gloss = s => { const t = String(s).trim(); return DATA && DATA.tr && DATA.tr[t] ? DATA.tr[t] : ""; };
 const glossHTML = s => { const g = gloss(s); return g ? `<span class="g">(${esc(g)})</span>` : ""; };
+// probabilities are absolute (full softmax over the vocabulary): 1 decimal from 1%, 2 significant figures below
+const pct = p => { const x = p * 100; return (x >= 1 ? x.toFixed(1) : x.toPrecision(2)) + "%"; };
+const tokS = s => esc(JSON.stringify(s).slice(1, -1)) + (gloss(s) ? ` (${esc(gloss(s))})` : "");
+function nextLine(i) {
+  const nx = DATA.top[i] || [], ch = (DATA.chosen || [])[i], nt = DATA.tokens[i + 1];
+  if (!ch || !nt) return nx.length ? "next guesses: " + nx.map(([s, p]) => `${tokS(s)} ${pct(p)}`).join(" · ") : "&nbsp;";
+  const modelChose = nt.role === "assistant" && (nt.content || nt.s === "<|im_end|>");
+  const inTop = nx.findIndex(([s]) => s === nt.s);
+  const alts = nx.filter(([s]) => s !== nt.s).slice(0, 4).map(([s, p]) => `${tokS(s)} ${pct(p)}`).join(" · ");
+  return `<b class="ch">${modelChose ? "chose" : "actual next token"} ${tokS(nt.s)} ${pct(ch[0])}${inTop < 0 ? ` (rank ${ch[1]})` : ""}</b>`
+    + (alts ? ` · ${modelChose ? "alternatives" : "model expected"}: ${alts}` : "");
+}
 const avg = (arr, idx) => idx.reduce((a, i) => a + arr[i], 0) / Math.max(1, idx.length);
 
 function reqBody(extra) {
@@ -498,7 +511,7 @@ function renderReadings() {
   } else if (sel.tok !== undefined) {
     const t = DATA.tokens[sel.tok], nx = DATA.top[sel.tok] || [];
     head.innerHTML = `<span class="t">${esc(JSON.stringify(t.s).slice(1, -1))}</span>${glossHTML(t.s)}<span class="r">${t.role === "user" ? "your text" : t.role === "assistant" ? "model's text" : "template"}${PIN === sel.tok ? " · pinned" : ""}</span>`
-      + `<div class="nx">next: ${nx.map(([s, p]) => `${esc(JSON.stringify(s).slice(1, -1))}${gloss(s) ? ` (${esc(gloss(s))})` : ""} ${Math.round(p * 100)}%`).join(" · ")}</div>`;
+      + `<div class="nx">${nextLine(sel.tok)}</div>`;
   } else {
     const T = TURNS[sel.turn];
     const el = document.querySelector(`#chat .turn[data-turn="${sel.turn}"]`);
