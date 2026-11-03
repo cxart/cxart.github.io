@@ -60,7 +60,7 @@ button:hover { border-color: var(--muted); }
 #tokhead .r { font-size: 12px; color: var(--muted); margin-left: 6px; }
 #tokhead .nx { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .sec { margin-top: 8px; }
-.sec > .h { display: flex; justify-content: space-between; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 3px 0; border-bottom: 1px solid var(--line); user-select: none; }
+.sec > .h { display: flex; justify-content: space-between; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .05em; padding: 3px 0; border-bottom: 1px solid var(--line); user-select: none; }
 .sec.closed > .b { display: none; }
 .m { padding: 3px 0 1px; }
 .m .row1 { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; font-size: 12.5px; line-height: 1.25; }
@@ -71,17 +71,22 @@ button:hover { border-color: var(--muted); }
 .bar .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
 .bar .f { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
 .spark { display: block; width: 100%; height: 18px; margin-top: 1px; }
-#bm { }
-#bm table { border-collapse: separate; border-spacing: 1px; margin: 5px 0 2px; width: 100%; table-layout: auto; }
-#bm td { min-width: 8px; height: 11px; padding: 0; border-radius: 1px; }
-#bm td.lab { width: 1%; min-width: 96px; max-width: 130px; font-size: 10px; line-height: 1.15; color: var(--muted); padding-right: 5px; white-space: normal; }
-#bm th { font-size: 9px; font-weight: 400; color: var(--muted); padding: 0; text-align: center; }
-#bm td.wide { font-size: 9.5px; color: var(--fg); text-align: center; line-height: 11px; }
-#bm td.own { outline: 1.5px solid var(--fg); outline-offset: -1px; }
+#bm .hm { margin: 5px 0 3px; }
+#bm .hr { display: grid; grid-template-columns: 112px repeat(var(--n), minmax(0, 1fr)); column-gap: 2px; align-items: center; padding: 2px 0; border-radius: 2px; }
+#bm .hr:nth-child(even) { background: rgba(var(--white), .045); }
+:root[data-theme="light"] #bm .hr:nth-child(even) { background: rgba(0, 0, 0, .04); }
+#bm .hr.head { background: none; padding-bottom: 1px; }
+#bm .rl { font-size: 10px; line-height: 1.15; color: var(--muted); padding: 0 6px 0 3px; }
+#bm .hr:hover .rl { color: var(--fg); }
+#bm .hc { height: 11px; border-radius: 1px; box-sizing: border-box; }
+#bm .hh { font-size: 9px; color: var(--muted); text-align: center; }
+#bm .hc.own { outline: 1.5px solid var(--fg); outline-offset: -1px; }
+#bm .hc.ip { border: 1px dotted var(--muted); }
 .legend { font-size: 10.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .sw { display: inline-block; width: 11px; height: 8px; vertical-align: middle; border-radius: 1px; }
-.lensrow { font-size: 12px; margin: 4px 0; }
+.lensrow { font-size: 12px; margin: 4px 0; white-space: nowrap; overflow: hidden; }   /* one line only: chips that don't fit are dropped */
 .lensrow b { font-weight: 600; color: var(--muted); margin-right: 4px; }
+.chip .g, #tokhead .g { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 10px; color: var(--muted); margin-left: 3px; }
 .chip { display: inline-block; font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 11px; background: var(--soft); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; margin: 1px 2px; }
 .empty { color: var(--muted); font-size: 12px; padding: 4px 0; }
 #pop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 10; }
@@ -107,9 +112,9 @@ button:hover { border-color: var(--muted); }
       <label>temperature <input id="temp" type="number" step="0.1" min="0" max="2" value="0.7" style="width:56px"></label>
       <label>max tokens <input id="maxtok" type="number" min="1" max="1000" value="300" style="width:64px"></label>
       <label><input id="win" type="checkbox" checked> average nearby layers</label>
-      <label><input id="lens" type="checkbox" checked> planning ahead</label>
+      <label><input id="lens" type="checkbox" checked> J++ space</label>
       <label><input id="sparkon" type="checkbox"> history lines</label>
-      <label><input id="tpl" type="checkbox"> show template tokens</label>
+      <label><input id="tpl" type="checkbox" checked> show template tokens</label>
       <label><input id="light" type="checkbox"> light mode</label>
       <label>tint text by <select id="tint"><option value="">nothing</option></select></label>
       <label>system prompt <textarea id="sys"></textarea></label>
@@ -136,6 +141,7 @@ const LIVE = "http://localhost:8770";
 let PREF = {on: null, closed: {}, token: "", light: false, spark: false};
 try { Object.assign(PREF, JSON.parse(localStorage.getItem("fmri_prefs") || "{}")); } catch (e) {}
 delete PREF.cat;   // categories are fixed (Carter 2026-11-02); drop old saved overrides
+if (PREF.on) PREF.on = [...new Set(PREF.on.map(n => n === "confidence" ? "certainty" : n).filter(n => n !== "entropy" && n !== "eval_told"))];
 const save = () => { try { localStorage.setItem("fmri_prefs", JSON.stringify(PREF)); } catch (e) {} };
 save();
 const theme = () => document.documentElement.setAttribute("data-theme", PREF.light ? "light" : "dark");
@@ -146,6 +152,7 @@ $("#div").addEventListener("mousedown", e => {
   const move = ev => {
     PREF.split = Math.max(35, Math.min(75, ev.clientX / window.innerWidth * 100));
     $("#app").style.gridTemplateColumns = `minmax(0, ${PREF.split}fr) 6px minmax(0, ${100 - PREF.split}fr)`;
+    clearTimeout(RZ); RZ = setTimeout(renderReadings, 30);
   };
   const up = () => { $("#div").classList.remove("drag"); save(); removeEventListener("mousemove", move); removeEventListener("mouseup", up); };
   addEventListener("mousemove", move); addEventListener("mouseup", up);
@@ -233,7 +240,7 @@ function mcol(sign, s, alpha) {
   const k = Math.max(0, Math.min(1, s));
   return `rgba(${w.map((x, j) => Math.round(x + (c[j] - x) * k)).join(",")},${alpha ?? 1})`;
 }
-function cellcol(z) {   // brain map: neutral cell -> red / green by |z|
+function cellcol(z) {   // heatmap: neutral cell -> red / green by |z|
   if (z === undefined || z === null || isNaN(z)) return css("--cell");
   const a = Math.min(1, Math.abs(z) / 3);
   return `rgba(${css(z < 0 ? "--neg" : "--pos")},${(0.12 + 0.88 * a).toFixed(2)})`;
@@ -267,7 +274,8 @@ function renderChat() {
     if (t.turn < 0 || (!t.content && !showTpl)) return;
     let st = "";
     if (tm && t.content) st = ` style="background:${mcol(Math.sign(tm.z[i]), tm.u[i], 0.25 + 0.5 * tm.u[i])};color:#111"`;
-    html[t.turn] = (html[t.turn] || "") + `<span class="tk${t.content ? "" : " tpl"}${i === PIN ? " pin" : ""}" data-i="${i}"${st}>${esc(t.s)}</span>`;
+    const gl = gloss(t.s);
+    html[t.turn] = (html[t.turn] || "") + `<span class="tk${t.content ? "" : " tpl"}${i === PIN ? " pin" : ""}" data-i="${i}"${st}${gl ? ` title="${esc(gl)}"` : ""}>${esc(t.s)}</span>`;
   });
   let h = "";
   for (const k of Object.keys(TURNS).sort((a, b) => a - b)) {
@@ -329,6 +337,8 @@ function selection() {
   const t = NEAR !== null && TURNS[NEAR] && TURNS[NEAR].idx.length ? NEAR : (lastTurn("assistant") ?? lastTurn());
   return t === null ? null : {turn: t, idx: TURNS[t].idx};
 }
+const gloss = s => { const t = String(s).trim(); return DATA && DATA.tr && DATA.tr[t] ? DATA.tr[t] : ""; };
+const glossHTML = s => { const g = gloss(s); return g ? `<span class="g">(${esc(g)})</span>` : ""; };
 const avg = (arr, idx) => idx.reduce((a, i) => a + arr[i], 0) / Math.max(1, idx.length);
 
 function reqBody(extra) {
@@ -345,6 +355,7 @@ async function send() {
     const r = await api("/api/chat", reqBody());
     MSGS.push({role: "assistant", content: r.reply});
     DATA = r; PIN = PINT = HOV = NEAR = null;
+    if (r.tr_pending) setTimeout(fetchGlosses, 6000);
     $("#status").textContent = `${r.seconds}s` + (r.fallback.length ? ` · no baseline yet for: ${r.fallback.join(", ")}` : "");
   } catch (e) {
     MSGS.pop(); $("#msg").value = text; $("#status").textContent = "error: " + e.message;
@@ -355,7 +366,7 @@ async function send() {
 async function reread() {
   if (!MSGS.length || BUSY || SAVED || MODE === "saved") { renderPanel(); return; }
   BUSY = true; $("#status").textContent = "re-reading…";
-  try { DATA = await api("/api/read", reqBody()); $("#status").textContent = ""; }
+  try { DATA = await api("/api/read", reqBody()); $("#status").textContent = ""; if (DATA.tr_pending) setTimeout(fetchGlosses, 6000); }
   catch (e) { $("#status").textContent = "error: " + e.message; }
   BUSY = false; renderChat(); renderPanel();
 }
@@ -366,6 +377,14 @@ $("#bset").onclick = () => $("#settings").classList.toggle("open");
 $("#tpl").onchange = renderChat; $("#tint").onchange = renderChat;
 $("#win").onchange = reread; $("#lens").onchange = reread;
 
+async function fetchGlosses(tries = 0) {   // new translations arrive in the background (local / live modes)
+  const t = await tryJSON(BASE + "/api/tr", BASE ? {headers: {"X-Token": PREF.token || ""}} : {});
+  if (!t || !DATA) return;
+  DATA.tr = Object.assign(DATA.tr || {}, t.tr);
+  renderChat(); renderReadings();
+  if (t.pending && tries < 10) setTimeout(() => fetchGlosses(tries + 1), 6000);
+}
+
 // ---------------------------------------------------------------- right panel
 function section(id, title, count, inner) {
   const closed = PREF.closed[id] !== undefined ? PREF.closed[id] : false;
@@ -374,7 +393,7 @@ function section(id, title, count, inner) {
 function renderPanel() {
   if (!CFG) return;
   const ms = shown();
-  let html = section("_brain", "brain map", "", `<div id="bm"></div>`);
+  let html = section("_heat", "Layer × concept heatmap", "", `<div id="bm"></div>`);
   for (const c of CFG.categories) {
     const inC = ms.filter(m => catOf(m) === c);
     if (!inC.length) continue;
@@ -383,7 +402,7 @@ function renderPanel() {
       <div class="bar"><div class="mid"></div><div class="f"></div></div>
       ${PREF.spark ? `<svg class="spark" viewBox="0 0 300 18" preserveAspectRatio="none"></svg>` : ""}</div>`).join(""));
   }
-  if (CFG.lens_layers.length) html += section("_lens", "planning ahead", "", `<div id="lensbox"></div>`);
+  if (CFG.lens_layers.length) html += section("_lens", `J++ space · top tokens (${CFG.lens_layers.map(L => "L" + L).join(", ")})`, "", `<div id="lensbox"></div>`);
   $("#panel").innerHTML = html;
   document.querySelectorAll(".sec > .h").forEach(h => h.onclick = () => {
     const s = h.parentElement, id = s.dataset.sec;
@@ -403,32 +422,29 @@ function spark(svg, z, idx, i) {
     + (k >= 0 ? `<line x1="${X(k)}" x2="${X(k)}" y1="0" y2="18" stroke="rgb(${css("--pin")})" stroke-width="2" vector-effect="non-scaling-stroke"/>` : "");
 }
 
-function renderBrain(sel) {
+function renderHeatmap(sel) {
   const box = $("#bm"); if (!box) return;
-  const ms = shown().filter(m => (m.cells || m.grid || []).length);
-  if (!ms.length) { box.innerHTML = `<div class="empty">no meters on</div>`; return; }
+  const ms = shown().filter(m => (m.cells || []).length > 1);   // single-layer meters (the neuron) stay meters only
+  if (!ms.length) { box.innerHTML = `<div class="empty">no multi-layer meters on</div>`; return; }
   const layers = CFG.grid_layers.slice().sort((a, b) => a - b);
   const zAt = (m, L) => {
     const g = DATA && sel && DATA.meters[m.name] && DATA.meters[m.name].grid ? DATA.meters[m.name].grid[L] : null;
     return g ? (sel.tok !== undefined ? g[sel.tok] : avg(g, sel.idx)) : null;
   };
-  let h = `<table><tr><td class="lab">shallow → deep</td>${layers.map(L => `<th>${L}</th>`).join("")}</tr>`;
+  let h = `<div class="hm" style="--n:${layers.length}"><div class="hr head"><div class="rl">layer →</div>${layers.map(L => `<div class="hh">${L}</div>`).join("")}</div>`;
   for (const m of ms) {
-    h += `<tr><td class="lab" title="${esc(m.label)}">${esc(m.label)}</td>`;
-    if (m.kind === "neuron") {   // one neuron at one layer: one wide cell
-      const z = zAt(m, m.layer);
-      h += `<td colspan="${layers.length}" class="wide" style="background:${cellcol(z)}" title="${esc(m.label)} L${m.layer}${z !== null ? ": " + z.toFixed(1) : ""}">one neuron, layer ${m.layer}</td></tr>`;
-      continue;
-    }
-    const cells = m.cells || m.grid;
-    const own = m.kind === "logits" ? null : cells.reduce((b, L) => Math.abs(L - m.layer) < Math.abs(b - m.layer) ? L : b, cells[0]);
+    const own = m.kind === "logits" ? null : m.cells.reduce((b, L) => Math.abs(L - m.layer) < Math.abs(b - m.layer) ? L : b, m.cells[0]);
+    const ip = m.interp || {};
+    h += `<div class="hr"><div class="rl">${esc(m.label)}</div>`;
     for (const L of layers) {
-      const z = zAt(m, L), has = cells.includes(L);
-      h += `<td class="${has && L === own ? "own" : ""}" style="background:${has ? cellcol(z) : "transparent"}" title="${esc(m.label)} L${L}${z !== null && z !== undefined ? ": " + z.toFixed(1) : ""}"></td>`;
+      const z = zAt(m, L), src = ip[L];
+      const tip = `${m.label} · layer ${L}${z !== null && z !== undefined ? ": " + z.toFixed(1) : ""}`
+        + (src ? (src.length > 1 ? ` · interpolated (mean of layers ${src.join(" and ")})` : ` · interpolated (copied from layer ${src[0]}, no layer above)`) : "");
+      h += `<div class="hc${L === own ? " own" : ""}${src ? " ip" : ""}" style="background:${cellcol(z)}" title="${esc(tip)}"></div>`;
     }
-    h += "</tr>";
+    h += "</div>";
   }
-  h += `</table><div class="legend"><span><i class="sw" style="background:${cellcol(-3)}"></i> toward the left label</span><span><i class="sw" style="background:${cellcol(3)}"></i> toward the right label</span><span><i class="sw" style="outline:1.5px solid ${css("--fg")}"></i> meter's layer</span></div>`;
+  h += `</div><div class="legend"><span><i class="sw" style="background:${cellcol(-3)}"></i> toward the left label</span><span><i class="sw" style="background:${cellcol(3)}"></i> toward the right label</span><span><i class="sw" style="outline:1.5px solid ${css("--fg")}"></i> meter's layer</span><span><i class="sw" style="border:1px dotted ${css("--muted")}"></i> interpolated</span></div>`;
   box.innerHTML = h;
 }
 
@@ -442,8 +458,8 @@ function renderReadings() {
     head.innerHTML = `<span class="empty">${DATA ? "hover over a word" : "chat to see readings; hover over any word"}</span>`;
   } else if (sel.tok !== undefined) {
     const t = DATA.tokens[sel.tok], nx = DATA.top[sel.tok] || [];
-    head.innerHTML = `<span class="t">${esc(JSON.stringify(t.s).slice(1, -1))}</span><span class="r">${t.role === "user" ? "your text" : t.role === "assistant" ? "model's text" : "template"}${PIN === sel.tok ? " · pinned" : ""}</span>`
-      + `<div class="nx">next: ${nx.map(([s, p]) => `${esc(JSON.stringify(s).slice(1, -1))} ${Math.round(p * 100)}%`).join(" · ")}</div>`;
+    head.innerHTML = `<span class="t">${esc(JSON.stringify(t.s).slice(1, -1))}</span>${glossHTML(t.s)}<span class="r">${t.role === "user" ? "your text" : t.role === "assistant" ? "model's text" : "template"}${PIN === sel.tok ? " · pinned" : ""}</span>`
+      + `<div class="nx">next: ${nx.map(([s, p]) => `${esc(JSON.stringify(s).slice(1, -1))}${gloss(s) ? ` (${esc(gloss(s))})` : ""} ${Math.round(p * 100)}%`).join(" · ")}</div>`;
   } else {
     const T = TURNS[sel.turn];
     const el = document.querySelector(`#chat .turn[data-turn="${sel.turn}"]`);
@@ -461,18 +477,30 @@ function renderReadings() {
     const zc = Math.max(-3, Math.min(3, z)), w = Math.abs(zc) / 3 * 50;
     f.style.left = (zc >= 0 ? 50 : 50 - w) + "%"; f.style.width = w + "%";
     f.style.background = mcol(Math.sign(z), u);
-    v.textContent = (d.tokens && sel.tok !== undefined ? `~${d.tokens[sel.tok]} left · ` : "") + (z >= 0 ? "+" : "") + z.toFixed(1);
+    v.textContent = (d.tokens && sel.tok !== undefined ? `~${d.tokens[sel.tok]} ${el.dataset.m.startsWith("since") ? "so far" : "left"} · ` : "") + (z >= 0 ? "+" : "") + z.toFixed(1);
     v.style.color = mcol(Math.sign(z), Math.max(0.35, u));
     spark(sv, d.z, tokIdx, sel.tok !== undefined ? sel.tok : null);
   });
-  renderBrain(sel);
+  renderHeatmap(sel);
   const lb = $("#lensbox");
   if (lb) {
     if (!DATA || !sel || !Object.keys(DATA.lens_top || {}).length) lb.innerHTML = `<div class="empty">${$("#lens").checked ? "no lens on this backend" : "off (settings)"}</div>`;
-    else if (sel.tok === undefined) lb.innerHTML = `<div class="empty">hover a word to see what the model is planning there</div>`;
-    else lb.innerHTML = Object.keys(DATA.lens_top).sort((a, b) => a - b).map(L => `<div class="lensrow"><b>L${L}</b>${(DATA.lens_top[L][sel.tok] || []).map(([s]) => `<span class="chip">${esc(s.trim() || s)}</span>`).join("")}</div>`).join("");
+    else if (sel.tok === undefined) lb.innerHTML = `<div class="empty">hover a word to see its top J++ lens tokens</div>`;
+    else {
+      lb.innerHTML = Object.keys(DATA.lens_top).sort((a, b) => a - b).map(L => `<div class="lensrow"><b>L${L}</b>${(DATA.lens_top[L][sel.tok] || []).map(([s]) => `<span class="chip">${esc(s.trim() || s)}${glossHTML(s)}</span>`).join("")}</div>`).join("");
+      fitLens();
+    }
   }
 }
+
+function fitLens() {   // keep each J++ row on one line: drop the chips that would not fit
+  document.querySelectorAll("#lensbox .lensrow").forEach(row => {
+    const right = row.getBoundingClientRect().right;
+    [...row.querySelectorAll(".chip")].forEach(c => { if (c.getBoundingClientRect().right > right + 0.5) c.remove(); });
+  });
+}
+let RZ = null;
+addEventListener("resize", () => { clearTimeout(RZ); RZ = setTimeout(renderReadings, 60); });
 
 // ---------------------------------------------------------------- meters popup
 $("#bmeters").onclick = () => { renderPop(); $("#pop").classList.add("open"); };
