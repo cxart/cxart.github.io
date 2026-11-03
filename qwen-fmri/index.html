@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>qwen fMRI</title>
+<style>
+/* palette: lab/playground/playground.html (its dark theme is the default here) */
+:root, :root[data-theme="dark"] {
+  --bg: #131715; --panel: #1b201e; --fg: #e4e9e6; --muted: #949e99; --line: #2c3330; --soft: #202624;
+  --user: #222a27; --hover: 214, 170, 60; --pin: 230, 170, 60;
+  --neg: 229, 83, 75; --pos: 92, 198, 156; --white: 255, 255, 255; --cell: #262d2a; --track: #2a312e;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #f6f7f5; --panel: #ffffff; --fg: #1d2421; --muted: #67716c; --line: #dde2df; --soft: #f0f2f1;
+  --user: #eef1ef; --hover: 255, 214, 110; --pin: 255, 190, 60;
+  --neg: 192, 57, 43; --pos: 31, 122, 90; --white: 255, 255, 255; --cell: #eef0ee; --track: #e6e9e7;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+button, select, input, textarea { font: inherit; color: var(--fg); background: var(--soft); border: 1px solid var(--line); border-radius: 6px; }
+button { padding: 4px 10px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+#app { display: grid; grid-template-columns: 7fr 3fr; height: 100vh; }
+#left { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--line); }
+#top { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+#top h1 { font-size: 15px; margin: 0 6px 0 0; font-weight: 600; }
+#backend { font-size: 12px; color: var(--muted); }
+#backend.mock { color: rgb(var(--pin)); font-weight: 600; }
+#top .sp { flex: 1; }
+#settings { display: none; padding: 8px 16px; border-bottom: 1px solid var(--line); gap: 14px; flex-wrap: wrap; font-size: 13px; }
+#settings.open { display: flex; }
+#settings label { display: flex; align-items: center; gap: 4px; }
+#settings textarea { width: 300px; height: 38px; }
+#chat { flex: 1; overflow-y: auto; padding: 16px 24px; }
+.turn { margin: 0 0 14px; max-width: 820px; border-radius: 8px; }
+.turn.near { box-shadow: 0 0 0 1px rgba(var(--pin), .55); }
+.turn .who { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; padding-left: 2px; }
+.turn .txt { white-space: pre-wrap; word-wrap: break-word; padding: 8px 12px; border-radius: 8px; }
+.turn.user .txt { background: var(--user); }
+.turn.assistant .txt { background: var(--panel); border: 1px solid var(--line); }
+.turn.system .txt { background: var(--soft); font-size: 13px; }
+.tk { cursor: pointer; border-radius: 2px; }
+.tk:hover { background: rgba(var(--hover), .45); }
+.tk.pin { background: rgba(var(--pin), .7); color: #111; }
+.tk.tpl { color: var(--muted); font-size: 11px; }
+#form { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+#msg { flex: 1; resize: none; height: 54px; padding: 8px; background: var(--panel); }
+#status { font-size: 12px; color: var(--muted); padding: 0 16px 6px; min-height: 18px; }
+#right { overflow-y: auto; background: var(--panel); padding: 8px 12px 30px; }
+#tokhead { position: sticky; top: -8px; background: var(--panel); padding: 6px 0 6px; border-bottom: 1px solid var(--line); z-index: 2; }
+#tokhead .t { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; background: rgba(var(--hover), .35); padding: 1px 5px; border-radius: 3px; }
+#tokhead .r { font-size: 12px; color: var(--muted); margin-left: 6px; }
+#tokhead .nx { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.sec { margin-top: 8px; }
+.sec > .h { display: flex; justify-content: space-between; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 3px 0; border-bottom: 1px solid var(--line); user-select: none; }
+.sec.closed > .b { display: none; }
+.m { padding: 3px 0 1px; max-width: 380px; }
+.m .row1 { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; line-height: 1.25; }
+.m .lab { white-space: nowrap; }
+.m .ends { flex: 1; text-align: right; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m .val { font-variant-numeric: tabular-nums; font-size: 11.5px; min-width: 34px; text-align: right; }
+.bar { position: relative; height: 7px; border-radius: 4px; margin-top: 2px; background: var(--track); }
+.bar .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+.bar .f { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.spark { display: block; width: 100%; height: 18px; margin-top: 1px; }
+#bm { overflow-x: auto; }
+#bm table { border-collapse: separate; border-spacing: 1px; margin: 5px 0 2px; width: 100%; table-layout: auto; }
+#bm td { min-width: 12px; height: 11px; padding: 0; border-radius: 1px; }
+#bm td.lab { width: 1%; min-width: 0; font-size: 10px; color: var(--muted); padding-right: 5px; white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+#bm th { font-size: 9px; font-weight: 400; color: var(--muted); padding: 0; text-align: center; }
+#bm td.own { outline: 1.5px solid var(--fg); outline-offset: -1px; }
+.legend { font-size: 10.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.sw { display: inline-block; width: 11px; height: 8px; vertical-align: middle; border-radius: 1px; }
+.lensrow { font-size: 12px; margin: 4px 0; }
+.lensrow b { font-weight: 600; color: var(--muted); margin-right: 4px; }
+.chip { display: inline-block; font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 11px; background: var(--soft); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; margin: 1px 2px; }
+.empty { color: var(--muted); font-size: 12px; padding: 4px 0; }
+#pop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 10; }
+#pop.open { display: block; }
+#popin { position: absolute; right: 24px; top: 48px; width: 420px; max-width: calc(100vw - 32px); max-height: 80vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+#popin h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 0 4px; }
+#popin .pm { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 2px 0; }
+#popin .pm span { flex: 1; }
+#popin .pm.na { color: var(--muted); }
+#popin select { font-size: 12px; }
+@media (max-width: 800px) { #app { grid-template-columns: 1fr; grid-template-rows: 60vh auto; height: auto; } #right { border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <div id="top">
+      <h1>qwen fMRI</h1><span id="backend"></span><span class="sp"></span>
+      <select id="sess" style="display:none"></select>
+      <button id="bnew">new chat</button><button id="bexp">export session</button><button id="bmeters">meters</button><button id="bset">settings</button>
+    </div>
+    <div id="settings">
+      <label>temperature <input id="temp" type="number" step="0.1" min="0" max="2" value="0.7" style="width:56px"></label>
+      <label>max tokens <input id="maxtok" type="number" min="1" max="1000" value="300" style="width:64px"></label>
+      <label><input id="win" type="checkbox" checked> average nearby layers</label>
+      <label><input id="lens" type="checkbox" checked> planning ahead</label>
+      <label><input id="sparkon" type="checkbox"> history lines</label>
+      <label><input id="tpl" type="checkbox"> show template tokens</label>
+      <label><input id="light" type="checkbox"> light mode</label>
+      <label>tint text by <select id="tint"><option value="">nothing</option></select></label>
+      <label>system prompt <textarea id="sys"></textarea></label>
+      <label id="tokwrap" style="display:none">local app token <input id="tok" type="password" style="width:200px"></label>
+    </div>
+    <div id="chat"></div>
+    <div id="status"></div>
+    <div id="form"><textarea id="msg"></textarea><button id="send">Send</button></div>
+  </div>
+  <div id="right">
+    <div id="tokhead"><span class="empty">hover over a word</span></div>
+    <div id="panel"></div>
+  </div>
+</div>
+<div id="pop"><div id="popin"></div></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+let CFG = null, DATA = null, MSGS = [], HOV = null, NEAR = null, PIN = null, BUSY = false;
+// modes: "local" = served by fmri_app.py; on a static host: "live" = talking to the local app at LIVE, else "saved"
+let MODE = "local", BASE = "", SAVED = false;
+const LIVE = "http://localhost:8770";
+let PREF = {on: null, cat: {}, closed: {}, token: "", light: false, spark: false};
+try { Object.assign(PREF, JSON.parse(localStorage.getItem("fmri_prefs") || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem("fmri_prefs", JSON.stringify(PREF)); } catch (e) {} };
+const theme = () => document.documentElement.setAttribute("data-theme", PREF.light ? "light" : "dark");
+theme();
+$("#light").checked = !!PREF.light; $("#sparkon").checked = !!PREF.spark;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+async function api(path, body) {
+  const h = {"Content-Type": "application/json"};
+  if (BASE) h["X-Token"] = PREF.token || "";
+  const r = await fetch(BASE + path, body ? {method: "POST", headers: h, body: JSON.stringify(body)} : (BASE ? {headers: {"X-Token": PREF.token || ""}} : {}));
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+const meterOn = () => PREF.on || CFG.default_on;
+const catOf = m => PREF.cat[m.name] || m.cat;
+const shown = () => CFG.meters.filter(m => m.status === "ok" && meterOn().includes(m.name) && (!SAVED || (DATA && DATA.meters[m.name])));
+
+async function tryJSON(url, opts) {
+  try { const r = await fetch(url, opts); return r.ok ? await r.json() : null; } catch (e) { return null; }
+}
+async function init() {
+  let cfg = await tryJSON("api/meters");
+  if (!cfg) {   // static host: live mode if the local app answers, else saved sessions only
+    $("#tokwrap").style.display = "";
+    $("#tok").value = PREF.token || "";
+    cfg = PREF.token ? await tryJSON(LIVE + "/api/meters", {headers: {"X-Token": PREF.token}}) : null;
+    if (cfg) { MODE = "live"; BASE = LIVE; } else MODE = "saved";
+    const idx = await tryJSON("sessions/index.json");
+    if (idx && idx.length) {
+      const sel = $("#sess");
+      sel.style.display = "";
+      sel.innerHTML = `<option value="">saved chats…</option>` + idx.map(x => `<option value="${esc(x.file)}">${esc(x.title)}</option>`).join("");
+      if (MODE === "saved") { sel.value = idx[0].file; await loadSession(idx[0].file); return; }
+    }
+  }
+  if (!cfg) { setBackend(); $("#status").textContent = "no saved chats and the local app is not running"; return; }
+  setCfg(cfg); setBackend(); renderPanel();
+}
+function setCfg(cfg) {
+  CFG = cfg;
+  const tint = $("#tint");
+  tint.innerHTML = `<option value="">nothing</option>`;
+  CFG.meters.filter(m => m.status === "ok").forEach(m => tint.insertAdjacentHTML("beforeend", `<option value="${m.name}">${esc(m.label)}</option>`));
+}
+function setBackend() {
+  const b = $("#backend");
+  if (MODE === "saved") { b.textContent = "saved chat (run the local app for live chat)"; b.className = ""; }
+  else if (CFG.backend.kind === "mock") { b.textContent = "mock backend: fake readings"; b.className = "mock"; }
+  else { b.textContent = (MODE === "live" ? "live · " : "") + CFG.backend.label; b.className = ""; }
+  const canChat = MODE !== "saved";
+  $("#form").style.display = canChat ? "" : "none";
+  $("#bexp").style.display = canChat ? "" : "none";
+  $("#bnew").style.display = canChat ? "" : "none";
+}
+async function loadSession(file) {
+  const S = await tryJSON("sessions/" + file);
+  if (!S) { $("#status").textContent = "could not load " + file; return; }
+  setCfg(S.cfg); SAVED = true;
+  MSGS = S.messages; DATA = S.data; PIN = HOV = NEAR = null;
+  $("#sys").value = S.system || "";
+  setBackend(); renderChat(); renderPanel();
+  $("#status").textContent = `recorded ${S.created} · ${S.backend}`;
+}
+$("#sess").onchange = e => { if (e.target.value) loadSession(e.target.value); };
+$("#tok").onchange = () => { PREF.token = $("#tok").value.trim(); save(); location.reload(); };
+$("#light").onchange = () => { PREF.light = $("#light").checked; save(); theme(); renderChat(); renderReadings(); };
+$("#sparkon").onchange = () => { PREF.spark = $("#sparkon").checked; save(); renderPanel(); };
+$("#bexp").onclick = () => {
+  if (!DATA) { $("#status").textContent = "nothing to export yet"; return; }
+  const first = (MSGS.find(m => m.role === "user") || {content: "chat"}).content;
+  const S = {format: "qwen-fmri-session/1", title: first.slice(0, 60), created: new Date().toISOString().slice(0, 16).replace("T", " "),
+    backend: CFG.backend.label, cfg: CFG, on: meterOn(), system: $("#sys").value, messages: MSGS, data: DATA};
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(S)], {type: "application/json"}));
+  a.download = "qwen-fmri-" + S.created.replace(/[ :]/g, "-") + ".json";
+  a.click();
+};
+
+// ---------------------------------------------------------------- colours
+// a reading's colour: white at the centre, toward red (left label) or green (right label) with strength 0..1
+function mcol(sign, s, alpha) {
+  const w = css("--white").split(",").map(Number), c = css(sign < 0 ? "--neg" : "--pos").split(",").map(Number);
+  const k = Math.max(0, Math.min(1, s));
+  return `rgba(${w.map((x, j) => Math.round(x + (c[j] - x) * k)).join(",")},${alpha ?? 1})`;
+}
+function cellcol(z) {   // brain map: neutral cell -> red / green by |z|
+  if (z === undefined || z === null || isNaN(z)) return css("--cell");
+  const a = Math.min(1, Math.abs(z) / 3);
+  return `rgba(${css(z < 0 ? "--neg" : "--pos")},${(0.12 + 0.88 * a).toFixed(2)})`;
+}
+
+// ---------------------------------------------------------------- chat
+function turnInfo() {   // turn index -> {role, n (1-based count within role), idx: content token indices}
+  const T = {}, cnt = {};
+  if (!DATA) return T;
+  DATA.tokens.forEach((t, i) => {
+    if (t.turn < 0) return;
+    const x = T[t.turn] || (T[t.turn] = {role: null, idx: []});
+    if (t.role && !x.role) { x.role = t.role; cnt[t.role] = (cnt[t.role] || 0) + 1; x.n = cnt[t.role]; }
+    if (t.content) x.idx.push(i);
+  });
+  return T;
+}
+let TURNS = {};
+function renderChat() {
+  const box = $("#chat");
+  if (!DATA) {
+    box.innerHTML = MSGS.map(m => `<div class="turn ${m.role}"><div class="who">${m.role === "user" ? "you" : "model"}</div><div class="txt">${esc(m.content)}</div></div>`).join("")
+      + (BUSY ? `<div class="turn assistant"><div class="who">model</div><div class="txt">…</div></div>` : "");
+    return;
+  }
+  TURNS = turnInfo();
+  const showTpl = $("#tpl").checked, tint = $("#tint").value;
+  const tm = tint && DATA.meters[tint] ? DATA.meters[tint] : null;
+  const html = {};
+  DATA.tokens.forEach((t, i) => {
+    if (t.turn < 0 || (!t.content && !showTpl)) return;
+    let st = "";
+    if (tm && t.content) st = ` style="background:${mcol(Math.sign(tm.z[i]), tm.u[i], 0.25 + 0.5 * tm.u[i])};color:#111"`;
+    html[t.turn] = (html[t.turn] || "") + `<span class="tk${t.content ? "" : " tpl"}${i === PIN ? " pin" : ""}" data-i="${i}"${st}>${esc(t.s)}</span>`;
+  });
+  let h = "";
+  for (const k of Object.keys(TURNS).sort((a, b) => a - b)) {
+    const role = TURNS[k].role || "assistant";
+    h += `<div class="turn ${role}" data-turn="${k}"><div class="who">${role === "user" ? "you" : role === "system" ? "system" : "model"}</div><div class="txt">${html[k] || ""}</div></div>`;
+  }
+  if (BUSY) h += `<div class="turn user"><div class="who">you</div><div class="txt">${esc(MSGS[MSGS.length - 1].content)}</div></div><div class="turn assistant"><div class="who">model</div><div class="txt">…</div></div>`;
+  box.innerHTML = h;
+}
+
+function nearestTurn(y) {
+  let best = null, bd = 1e9;
+  document.querySelectorAll("#chat .turn[data-turn]").forEach(el => {
+    const r = el.getBoundingClientRect(), d = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0;
+    if (d < bd) { bd = d; best = +el.dataset.turn; }
+  });
+  return best;
+}
+$("#chat").addEventListener("mousemove", e => {
+  if (!DATA) return;
+  const s = e.target.closest(".tk");
+  const h = s ? +s.dataset.i : null, n = s ? null : nearestTurn(e.clientY);
+  if (h === HOV && n === NEAR) return;
+  HOV = h; NEAR = n; renderReadings();
+});
+$("#chat").addEventListener("mouseleave", () => { HOV = NEAR = null; renderReadings(); });
+$("#chat").addEventListener("click", e => {
+  const s = e.target.closest(".tk"); if (!s) return;
+  const i = +s.dataset.i;
+  PIN = PIN === i ? null : i;
+  document.querySelectorAll(".tk.pin").forEach(x => x.classList.remove("pin"));
+  if (PIN !== null) s.classList.add("pin");
+  renderReadings();
+});
+
+function lastTurn(role) {
+  const ks = Object.keys(TURNS).filter(k => TURNS[k].idx.length && (!role || TURNS[k].role === role)).map(Number);
+  return ks.length ? Math.max(...ks) : null;
+}
+// what the right side shows: a token (hovered, else pinned) or a whole turn's average (nearest turn, else last model turn)
+function selection() {
+  if (!DATA) return null;
+  if (HOV !== null) return {tok: HOV};
+  if (PIN !== null) return {tok: PIN};
+  const t = NEAR !== null && TURNS[NEAR] && TURNS[NEAR].idx.length ? NEAR : (lastTurn("assistant") ?? lastTurn());
+  return t === null ? null : {turn: t, idx: TURNS[t].idx};
+}
+const avg = (arr, idx) => idx.reduce((a, i) => a + arr[i], 0) / Math.max(1, idx.length);
+
+function reqBody(extra) {
+  return Object.assign({messages: MSGS, system: $("#sys").value, meters: meterOn(), window: $("#win").checked,
+    lens: $("#lens").checked, temperature: +$("#temp").value, max_new_tokens: +$("#maxtok").value}, extra || {});
+}
+async function send() {
+  const text = $("#msg").value.trim();
+  if (!text || BUSY) return;
+  MSGS.push({role: "user", content: text});
+  $("#msg").value = ""; BUSY = true; renderChat(); $("#status").textContent = "thinking…";
+  if (SAVED) { SAVED = false; const c = await tryJSON(BASE + "/api/meters", BASE ? {headers: {"X-Token": PREF.token || ""}} : {}); if (c) setCfg(c); }
+  try {
+    const r = await api("/api/chat", reqBody());
+    MSGS.push({role: "assistant", content: r.reply});
+    DATA = r; PIN = HOV = NEAR = null;
+    $("#status").textContent = `${r.seconds}s` + (r.fallback.length ? ` · no baseline yet for: ${r.fallback.join(", ")}` : "");
+  } catch (e) {
+    MSGS.pop(); $("#msg").value = text; $("#status").textContent = "error: " + e.message;
+  }
+  BUSY = false; renderChat(); renderPanel();
+  $("#chat").scrollTop = 1e9;
+}
+async function reread() {
+  if (!MSGS.length || BUSY || SAVED || MODE === "saved") { renderPanel(); return; }
+  BUSY = true; $("#status").textContent = "re-reading…";
+  try { DATA = await api("/api/read", reqBody()); $("#status").textContent = ""; }
+  catch (e) { $("#status").textContent = "error: " + e.message; }
+  BUSY = false; renderChat(); renderPanel();
+}
+$("#send").onclick = send;
+$("#msg").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+$("#bnew").onclick = () => { if (MODE === "saved") return; SAVED = false; MSGS = []; DATA = null; PIN = HOV = NEAR = null; renderChat(); renderPanel(); $("#status").textContent = ""; };
+$("#bset").onclick = () => $("#settings").classList.toggle("open");
+$("#tpl").onchange = renderChat; $("#tint").onchange = renderChat;
+$("#win").onchange = reread; $("#lens").onchange = reread;
+
+// ---------------------------------------------------------------- right panel
+function section(id, title, count, inner) {
+  const closed = PREF.closed[id] !== undefined ? PREF.closed[id] : false;
+  return `<div class="sec${closed ? " closed" : ""}" data-sec="${esc(id)}"><div class="h"><span>${esc(title)}</span><span>${count}</span></div><div class="b">${inner}</div></div>`;
+}
+function renderPanel() {
+  if (!CFG) return;
+  const ms = shown();
+  let html = section("_brain", "brain map", "", `<div id="bm"></div>`);
+  for (const c of CFG.categories) {
+    const inC = ms.filter(m => catOf(m) === c);
+    if (!inC.length) continue;
+    html += section(c, c, inC.length, inC.map(m => `<div class="m" data-m="${m.name}">
+      <div class="row1"><span class="lab">${esc(m.label)}</span><span class="ends">${esc(m.minus)} ↔ ${esc(m.plus)}</span><span class="val"></span></div>
+      <div class="bar"><div class="mid"></div><div class="f"></div></div>
+      ${PREF.spark ? `<svg class="spark" viewBox="0 0 300 18" preserveAspectRatio="none"></svg>` : ""}</div>`).join(""));
+  }
+  if (CFG.lens_layers.length) html += section("_lens", "planning ahead", "", `<div id="lensbox"></div>`);
+  $("#panel").innerHTML = html;
+  document.querySelectorAll(".sec > .h").forEach(h => h.onclick = () => {
+    const s = h.parentElement, id = s.dataset.sec;
+    s.classList.toggle("closed"); PREF.closed[id] = s.classList.contains("closed"); save();
+  });
+  renderReadings();
+}
+
+function spark(svg, z, idx, i) {
+  if (!svg) return;
+  if (!idx.length) { svg.innerHTML = ""; return; }
+  const n = idx.length, X = k => n === 1 ? 150 : k / (n - 1) * 300, Y = v => 9 - Math.max(-3, Math.min(3, v)) * 2.7;
+  const pts = idx.map((t, k) => `${X(k).toFixed(1)},${Y(z[t]).toFixed(1)}`).join(" ");
+  const k = i === null ? -1 : idx.indexOf(i);
+  svg.innerHTML = `<line x1="0" x2="300" y1="9" y2="9" stroke="${css("--line")}" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+    + `<polyline points="${pts}" fill="none" stroke="${css("--muted")}" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`
+    + (k >= 0 ? `<line x1="${X(k)}" x2="${X(k)}" y1="0" y2="18" stroke="rgb(${css("--pin")})" stroke-width="2" vector-effect="non-scaling-stroke"/>` : "");
+}
+
+function renderBrain(sel) {
+  const box = $("#bm"); if (!box) return;
+  const ms = shown().filter(m => (m.cells || m.grid || []).length);
+  if (!ms.length) { box.innerHTML = `<div class="empty">no meters on</div>`; return; }
+  const layers = [...new Set([...CFG.grid_layers, ...ms.flatMap(m => m.cells || m.grid || [])])].sort((a, b) => a - b);
+  const colLab = L => L === 63 ? "out" : L;
+  let h = `<table><tr><td class="lab">shallow → deep</td>${layers.map(L => `<th>${colLab(L)}</th>`).join("")}</tr>`;
+  for (const m of ms) {
+    const cells = m.cells || m.grid;
+    const own = cells.reduce((b, L) => Math.abs(L - m.layer) < Math.abs(b - m.layer) ? L : b, cells[0]);
+    h += `<tr><td class="lab" title="${esc(m.label)}">${esc(m.label)}</td>`;
+    for (const L of layers) {
+      const g = DATA && sel && DATA.meters[m.name] && DATA.meters[m.name].grid ? DATA.meters[m.name].grid[L] : null;
+      const z = g ? (sel.tok !== undefined ? g[sel.tok] : avg(g, sel.idx)) : null;
+      const has = cells.includes(L);
+      h += `<td class="${has && L === own ? "own" : ""}" style="background:${has ? cellcol(z) : "transparent"}" title="${esc(m.label)} L${L}${z !== null && z !== undefined ? ": " + z.toFixed(1) : ""}"></td>`;
+    }
+    h += "</tr>";
+  }
+  h += `</table><div class="legend"><span><i class="sw" style="background:${cellcol(-3)}"></i> toward the left label</span><span><i class="sw" style="background:${cellcol(3)}"></i> toward the right label</span><span><i class="sw" style="outline:1.5px solid ${css("--fg")}"></i> meter's layer</span></div>`;
+  box.innerHTML = h;
+}
+
+function renderReadings() {
+  if (!CFG) return;
+  const sel = selection();
+  const head = $("#tokhead");
+  document.querySelectorAll("#chat .turn.near").forEach(x => x.classList.remove("near"));
+  if (!sel) {
+    head.innerHTML = `<span class="empty">${DATA ? "hover over a word" : "chat to see readings; hover over any word"}</span>`;
+  } else if (sel.tok !== undefined) {
+    const t = DATA.tokens[sel.tok], nx = DATA.top[sel.tok] || [];
+    head.innerHTML = `<span class="t">${esc(JSON.stringify(t.s).slice(1, -1))}</span><span class="r">${t.role === "user" ? "your text" : t.role === "assistant" ? "model's text" : "template"}${PIN === sel.tok ? " · pinned" : ""}</span>`
+      + `<div class="nx">next: ${nx.map(([s, p]) => `${esc(JSON.stringify(s).slice(1, -1))} ${Math.round(p * 100)}%`).join(" · ")}</div>`;
+  } else {
+    const T = TURNS[sel.turn];
+    const el = document.querySelector(`#chat .turn[data-turn="${sel.turn}"]`);
+    if (el) el.classList.add("near");
+    head.innerHTML = `<span class="t">${T.role === "user" ? "your" : "model"} turn ${T.n} (average)</span><span class="r">${T.idx.length} tokens · hover a word for one token</span><div class="nx">&nbsp;</div>`;
+  }
+  const tokIdx = sel ? (sel.tok !== undefined ? (TURNS[DATA.tokens[sel.tok].turn] || {idx: []}).idx : sel.idx) : [];
+  document.querySelectorAll(".m").forEach(el => {
+    const d = DATA && DATA.meters[el.dataset.m];
+    const f = el.querySelector(".f"), v = el.querySelector(".val"), sv = el.querySelector(".spark");
+    if (!d || !sel) { f.style.width = "0"; v.textContent = ""; if (sv) sv.innerHTML = ""; return; }
+    let z, u;
+    if (sel.tok !== undefined) { z = d.z[sel.tok]; u = d.u[sel.tok]; }
+    else { z = avg(d.z, sel.idx); u = Math.min(1, Math.abs(z) / 2); }
+    const zc = Math.max(-3, Math.min(3, z)), w = Math.abs(zc) / 3 * 50;
+    f.style.left = (zc >= 0 ? 50 : 50 - w) + "%"; f.style.width = w + "%";
+    f.style.background = mcol(Math.sign(z), u);
+    v.textContent = (d.tokens && sel.tok !== undefined ? `~${d.tokens[sel.tok]} left · ` : "") + (z >= 0 ? "+" : "") + z.toFixed(1);
+    v.style.color = mcol(Math.sign(z), Math.max(0.35, u));
+    spark(sv, d.z, tokIdx, sel.tok !== undefined ? sel.tok : null);
+  });
+  renderBrain(sel);
+  const lb = $("#lensbox");
+  if (lb) {
+    if (!DATA || !sel || !Object.keys(DATA.lens_top || {}).length) lb.innerHTML = `<div class="empty">${$("#lens").checked ? "no lens on this backend" : "off (settings)"}</div>`;
+    else if (sel.tok === undefined) lb.innerHTML = `<div class="empty">hover a word to see what the model is planning there</div>`;
+    else lb.innerHTML = Object.keys(DATA.lens_top).sort((a, b) => a - b).map(L => `<div class="lensrow"><b>L${L}</b>${(DATA.lens_top[L][sel.tok] || []).map(([s]) => `<span class="chip">${esc(s.trim() || s)}</span>`).join("")}</div>`).join("");
+  }
+}
+
+// ---------------------------------------------------------------- meters popup
+$("#bmeters").onclick = () => { renderPop(); $("#pop").classList.add("open"); };
+$("#pop").onclick = e => { if (e.target.id === "pop") closePop(); };
+let POPDIRTY = false;
+function closePop() { $("#pop").classList.remove("open"); if (POPDIRTY) { POPDIRTY = false; reread(); } }
+function renderPop() {
+  const on = meterOn();
+  let h = `<div style="display:flex;justify-content:space-between"><b>meters</b><span><button id="preset">default set</button> <button id="pclose">done</button></span></div>`;
+  for (const c of CFG.categories) {
+    const inC = CFG.meters.filter(m => catOf(m) === c);
+    if (!inC.length) continue;
+    h += `<h3>${esc(c)}</h3>` + inC.map(m => `<div class="pm${m.status === "ok" ? "" : " na"}">
+      <input type="checkbox" data-n="${m.name}" ${on.includes(m.name) ? "checked" : ""} ${m.status === "ok" ? "" : "disabled"}>
+      <span>${esc(m.label)}${m.status === "ok" ? "" : ` <i>(${esc(m.note)})</i>`}${SAVED && m.status === "ok" && !(DATA && DATA.meters[m.name]) ? " <i>(not in this saved chat)</i>" : ""}</span>
+      <select data-c="${m.name}">${CFG.categories.map(x => `<option${x === c ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></div>`).join("");
+  }
+  $("#popin").innerHTML = h;
+  $("#pclose").onclick = closePop;
+  $("#preset").onclick = () => { PREF.on = null; PREF.cat = {}; save(); POPDIRTY = true; renderPop(); renderPanel(); };
+  $("#popin").querySelectorAll("input[data-n]").forEach(x => x.onchange = () => {
+    const s = new Set(meterOn()); x.checked ? s.add(x.dataset.n) : s.delete(x.dataset.n);
+    PREF.on = [...s]; save(); POPDIRTY = true; renderPanel();
+  });
+  $("#popin").querySelectorAll("select[data-c]").forEach(x => x.onchange = () => {
+    PREF.cat[x.dataset.c] = x.value; save(); renderPop(); renderPanel();
+  });
+}
+init().catch(e => { $("#status").textContent = "error: " + e.message; });
+</script>
+</body>
+</html>
