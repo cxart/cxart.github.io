@@ -82,6 +82,14 @@ button:hover { border-color: var(--muted); }
 #bm .hh { font-size: 9px; color: var(--muted); text-align: center; }
 #bm .hc.own { outline: 1.5px solid var(--fg); outline-offset: -1px; }
 #bm .hc.ip { border: 1px dotted var(--muted); }
+.views { display: flex; gap: 4px; margin: 5px 0 2px; }
+.views button { font-size: 11px; padding: 1px 8px; }
+.views button.on { background: var(--fg); color: var(--bg); }
+#atl .bands { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin: 4px 0; }
+#atl .band { font-size: 10px; color: var(--muted); text-align: center; }
+#atl svg { display: block; width: 100%; aspect-ratio: 1; background: var(--soft); border-radius: 4px; }
+#atl circle:hover { stroke: var(--fg); stroke-width: .006; }
+#atl .note { font-size: 10.5px; color: var(--muted); }
 .legend { font-size: 10.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .sw { display: inline-block; width: 11px; height: 8px; vertical-align: middle; border-radius: 1px; }
 .lensrow { font-size: 12px; margin: 4px 0; white-space: nowrap; overflow: hidden; }   /* one line only: chips that don't fit are dropped */
@@ -113,6 +121,7 @@ button:hover { border-color: var(--muted); }
       <label>max tokens <input id="maxtok" type="number" min="1" max="1000" value="300" style="width:64px"></label>
       <label><input id="win" type="checkbox" checked> average nearby layers</label>
       <label><input id="lens" type="checkbox" checked> J++ space</label>
+      <label><input id="atlason" type="checkbox" checked> neuron atlas (exploratory)</label>
       <label><input id="sparkon" type="checkbox"> history lines</label>
       <label><input id="tpl" type="checkbox" checked> show template tokens</label>
       <label><input id="light" type="checkbox"> light mode</label>
@@ -138,9 +147,11 @@ let CFG = null, DATA = null, MSGS = [], HOV = null, NEAR = null, PIN = null, PIN
 // modes: "local" = served by fmri_app.py; on a static host: "live" = talking to the local app at LIVE, else "saved"
 let MODE = "local", BASE = "", SAVED = false;
 const LIVE = "http://localhost:8770";
-let PREF = {on: null, closed: {}, token: "", light: false, spark: false};
+let PREF = {on: null, closed: {}, token: "", light: false, spark: false, view: "heat"};
+let ATLAS = null;   // the fixed neuron-atlas map (04_atlas): regions with band, x, y, label
 try { Object.assign(PREF, JSON.parse(localStorage.getItem("fmri_prefs") || "{}")); } catch (e) {}
 delete PREF.cat;   // categories are fixed (Carter 2026-11-02); drop old saved overrides
+if (PREF.defaults !== 2) { PREF.on = null; PREF.defaults = 2; }   // new default meter set (Carter 2026-11-02): reset saved selection once (saved below)
 if (PREF.on) PREF.on = [...new Set(PREF.on.map(n => n === "confidence" ? "certainty" : n).filter(n => n !== "entropy" && n !== "eval_told"))];
 const save = () => { try { localStorage.setItem("fmri_prefs", JSON.stringify(PREF)); } catch (e) {} };
 save();
@@ -191,7 +202,13 @@ async function init() {
     }
   }
   if (!cfg) { setBackend(); $("#status").textContent = "no saved chats and the local app is not running"; return; }
-  setCfg(cfg); setBackend(); renderPanel();
+  setCfg(cfg); setBackend(); await loadAtlas(); renderPanel();
+}
+async function loadAtlas() {
+  if (ATLAS) return;
+  ATLAS = MODE === "saved" ? await tryJSON("atlas_map.json")
+    : await tryJSON(BASE + "/api/atlas", BASE ? {headers: {"X-Token": PREF.token || ""}} : {}) || await tryJSON("atlas_map.json");
+  if (ATLAS && !ATLAS.regions) ATLAS = null;
 }
 function setCfg(cfg) {
   CFG = cfg;
@@ -212,7 +229,7 @@ function setBackend() {
 async function loadSession(file) {
   const S = await tryJSON("sessions/" + file);
   if (!S) { $("#status").textContent = "could not load " + file; return; }
-  setCfg(S.cfg); SAVED = true;
+  setCfg(S.cfg); SAVED = true; await loadAtlas();
   MSGS = S.messages; DATA = S.data; PIN = PINT = HOV = NEAR = null;
   $("#sys").value = S.system || "";
   setBackend(); renderChat(); renderPanel();
@@ -343,7 +360,7 @@ const avg = (arr, idx) => idx.reduce((a, i) => a + arr[i], 0) / Math.max(1, idx.
 
 function reqBody(extra) {
   return Object.assign({messages: MSGS, system: $("#sys").value, meters: meterOn(), window: $("#win").checked,
-    lens: $("#lens").checked, temperature: +$("#temp").value, max_new_tokens: +$("#maxtok").value}, extra || {});
+    lens: $("#lens").checked, atlas: $("#atlason").checked, temperature: +$("#temp").value, max_new_tokens: +$("#maxtok").value}, extra || {});
 }
 async function send() {
   const text = $("#msg").value.trim();
@@ -375,7 +392,7 @@ $("#msg").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKe
 $("#bnew").onclick = () => { if (MODE === "saved") return; SAVED = false; MSGS = []; DATA = null; PIN = PINT = HOV = NEAR = null; renderChat(); renderPanel(); $("#status").textContent = ""; };
 $("#bset").onclick = () => $("#settings").classList.toggle("open");
 $("#tpl").onchange = renderChat; $("#tint").onchange = renderChat;
-$("#win").onchange = reread; $("#lens").onchange = reread;
+$("#win").onchange = reread; $("#lens").onchange = reread; $("#atlason").onchange = reread;
 
 async function fetchGlosses(tries = 0) {   // new translations arrive in the background (local / live modes)
   const t = await tryJSON(BASE + "/api/tr", BASE ? {headers: {"X-Token": PREF.token || ""}} : {});
@@ -393,17 +410,22 @@ function section(id, title, count, inner) {
 function renderPanel() {
   if (!CFG) return;
   const ms = shown();
-  let html = section("_heat", "Layer × concept heatmap", "", `<div id="bm"></div>`);
+  const atlasOK = ATLAS && (!DATA || DATA.atlas);
+  const view = PREF.view === "atlas" && atlasOK ? "atlas" : "heat";
+  const views = ATLAS ? `<div class="views"><button data-v="heat" class="${view === "heat" ? "on" : ""}">heatmap</button><button data-v="atlas" class="${view === "atlas" ? "on" : ""}" ${atlasOK ? "" : "disabled title=\"turn on the neuron atlas in settings\""}>neuron atlas (exploratory)</button></div>` : "";
+  let html = section("_heat", view === "atlas" ? "Neuron atlas (exploratory)" : "Layer × concept heatmap", "",
+    views + (view === "atlas" ? `<div id="atl"></div>` : `<div id="bm"></div>`));
   for (const c of CFG.categories) {
     const inC = ms.filter(m => catOf(m) === c);
     if (!inC.length) continue;
     html += section(c, c, inC.length, inC.map(m => `<div class="m" data-m="${m.name}">
-      <div class="row1"><span class="lab">${esc(m.label)}</span><span class="ends">${esc(m.minus)} ↔ ${esc(m.plus)}</span><span class="val"></span></div>
+      <div class="row1"><span class="lab"${m.tip ? ` title="${esc(m.tip)}" style="cursor:help;text-decoration:underline dotted var(--muted)"` : ""}>${esc(m.label)}</span><span class="ends">${esc(m.minus)} ↔ ${esc(m.plus)}</span><span class="val"></span></div>
       <div class="bar"><div class="mid"></div><div class="f"></div></div>
       ${PREF.spark ? `<svg class="spark" viewBox="0 0 300 18" preserveAspectRatio="none"></svg>` : ""}</div>`).join(""));
   }
   if (CFG.lens_layers.length) html += section("_lens", `J++ space · top tokens (${CFG.lens_layers.map(L => "L" + L).join(", ")})`, "", `<div id="lensbox"></div>`);
   $("#panel").innerHTML = html;
+  document.querySelectorAll(".views button").forEach(b => b.onclick = e => { e.stopPropagation(); PREF.view = b.dataset.v; save(); renderPanel(); });
   document.querySelectorAll(".sec > .h").forEach(h => h.onclick = () => {
     const s = h.parentElement, id = s.dataset.sec;
     s.classList.toggle("closed"); PREF.closed[id] = s.classList.contains("closed"); save();
@@ -448,6 +470,23 @@ function renderHeatmap(sel) {
   box.innerHTML = h;
 }
 
+function renderAtlas(sel) {
+  const box = $("#atl"); if (!box || !ATLAS) return;
+  const A = DATA && DATA.atlas;
+  const val = r => !A || !sel ? null : (sel.tok !== undefined ? A[sel.tok][r] : avg(A.map(row => row[r]), sel.idx));
+  let h = `<div class="bands">`;
+  for (const b of ATLAS.bands) {
+    const regs = ATLAS.regions.filter(r => r.band === b.band);
+    h += `<div><div class="band">layers ${b.layers[0]}–${b.layers[b.layers.length - 1]}</div><svg viewBox="-0.04 -0.04 1.08 1.08">`
+      + regs.map(r => { const z = val(r.id);
+          return `<circle cx="${r.x}" cy="${r.y}" r="0.026" fill="${cellcol(z)}"><title>${esc(r.label)} · ${r.n} neurons${z !== null && z !== undefined ? " · " + z.toFixed(1) : ""}</title></circle>`; }).join("")
+      + `</svg></div>`;
+  }
+  h += `</div><div class="legend"><span><i class="sw" style="background:${cellcol(-3)}"></i> less active than usual</span><span><i class="sw" style="background:${cellcol(3)}"></i> more active than usual</span></div>`
+    + `<div class="note">Each dot is a group of ~900 MLP neurons that tend to fire together; nearby dots fire together. Hover a dot for its name. The groups are loose (exploratory).</div>`;
+  box.innerHTML = h;
+}
+
 function renderReadings() {
   if (!CFG) return;
   const sel = selection();
@@ -482,6 +521,7 @@ function renderReadings() {
     spark(sv, d.z, tokIdx, sel.tok !== undefined ? sel.tok : null);
   });
   renderHeatmap(sel);
+  renderAtlas(sel);
   const lb = $("#lensbox");
   if (lb) {
     if (!DATA || !sel || !Object.keys(DATA.lens_top || {}).length) lb.innerHTML = `<div class="empty">${$("#lens").checked ? "no lens on this backend" : "off (settings)"}</div>`;
