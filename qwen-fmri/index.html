@@ -41,6 +41,7 @@ button:hover { border-color: var(--muted); }
 #chat { flex: 1; overflow-y: auto; padding: 16px 24px; }
 .turn { margin: 0 0 14px; max-width: 820px; border-radius: 8px; }
 .turn.near { box-shadow: 0 0 0 1px rgba(var(--pin), .55); }
+.turn.pinned { box-shadow: 0 0 0 2px rgba(var(--pin), .9); }
 .turn .who { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; padding-left: 2px; }
 .turn .txt { white-space: pre-wrap; word-wrap: break-word; padding: 8px 12px; border-radius: 8px; }
 .turn.user .txt { background: var(--user); }
@@ -75,6 +76,7 @@ button:hover { border-color: var(--muted); }
 #bm td { min-width: 8px; height: 11px; padding: 0; border-radius: 1px; }
 #bm td.lab { width: 1%; min-width: 96px; max-width: 130px; font-size: 10px; line-height: 1.15; color: var(--muted); padding-right: 5px; white-space: normal; }
 #bm th { font-size: 9px; font-weight: 400; color: var(--muted); padding: 0; text-align: center; }
+#bm td.wide { font-size: 9.5px; color: var(--fg); text-align: center; line-height: 11px; }
 #bm td.own { outline: 1.5px solid var(--fg); outline-offset: -1px; }
 .legend { font-size: 10.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .sw { display: inline-block; width: 11px; height: 8px; vertical-align: middle; border-radius: 1px; }
@@ -127,7 +129,7 @@ button:hover { border-color: var(--muted); }
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
-let CFG = null, DATA = null, MSGS = [], HOV = null, NEAR = null, PIN = null, BUSY = false;
+let CFG = null, DATA = null, MSGS = [], HOV = null, NEAR = null, PIN = null, PINT = null, BUSY = false;   // PIN: pinned token, PINT: pinned turn
 // modes: "local" = served by fmri_app.py; on a static host: "live" = talking to the local app at LIVE, else "saved"
 let MODE = "local", BASE = "", SAVED = false;
 const LIVE = "http://localhost:8770";
@@ -204,7 +206,7 @@ async function loadSession(file) {
   const S = await tryJSON("sessions/" + file);
   if (!S) { $("#status").textContent = "could not load " + file; return; }
   setCfg(S.cfg); SAVED = true;
-  MSGS = S.messages; DATA = S.data; PIN = HOV = NEAR = null;
+  MSGS = S.messages; DATA = S.data; PIN = PINT = HOV = NEAR = null;
   $("#sys").value = S.system || "";
   setBackend(); renderChat(); renderPanel();
   $("#status").textContent = `recorded ${S.created} · ${S.backend}`;
@@ -293,12 +295,25 @@ $("#chat").addEventListener("mousemove", e => {
 });
 $("#chat").addEventListener("mouseleave", () => { HOV = NEAR = null; renderReadings(); });
 $("#chat").addEventListener("click", e => {
-  const s = e.target.closest(".tk"); if (!s) return;
-  const i = +s.dataset.i;
-  PIN = PIN === i ? null : i;
+  if (!DATA) return;
+  const s = e.target.closest(".tk");
+  if (s) {   // pin / unpin a token (replaces a pinned turn)
+    const i = +s.dataset.i;
+    PIN = PIN === i ? null : i; PINT = null;
+  } else {   // a click in a message but not on a word pins / unpins that whole turn's average
+    const tEl = e.target.closest(".turn[data-turn]");
+    if (!tEl) return;
+    const t = +tEl.dataset.turn;
+    PINT = PINT === t ? null : t; PIN = null;
+  }
   document.querySelectorAll(".tk.pin").forEach(x => x.classList.remove("pin"));
-  if (PIN !== null) s.classList.add("pin");
+  if (PIN !== null) { const el = document.querySelector(`.tk[data-i="${PIN}"]`); if (el) el.classList.add("pin"); }
   renderReadings();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && (PIN !== null || PINT !== null)) {
+    PIN = PINT = null; document.querySelectorAll(".tk.pin").forEach(x => x.classList.remove("pin")); renderReadings();
+  }
 });
 
 function lastTurn(role) {
@@ -310,6 +325,7 @@ function selection() {
   if (!DATA) return null;
   if (HOV !== null) return {tok: HOV};
   if (PIN !== null) return {tok: PIN};
+  if (PINT !== null && TURNS[PINT] && TURNS[PINT].idx.length) return {turn: PINT, idx: TURNS[PINT].idx, pinned: true};
   const t = NEAR !== null && TURNS[NEAR] && TURNS[NEAR].idx.length ? NEAR : (lastTurn("assistant") ?? lastTurn());
   return t === null ? null : {turn: t, idx: TURNS[t].idx};
 }
@@ -328,7 +344,7 @@ async function send() {
   try {
     const r = await api("/api/chat", reqBody());
     MSGS.push({role: "assistant", content: r.reply});
-    DATA = r; PIN = HOV = NEAR = null;
+    DATA = r; PIN = PINT = HOV = NEAR = null;
     $("#status").textContent = `${r.seconds}s` + (r.fallback.length ? ` · no baseline yet for: ${r.fallback.join(", ")}` : "");
   } catch (e) {
     MSGS.pop(); $("#msg").value = text; $("#status").textContent = "error: " + e.message;
@@ -345,7 +361,7 @@ async function reread() {
 }
 $("#send").onclick = send;
 $("#msg").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
-$("#bnew").onclick = () => { if (MODE === "saved") return; SAVED = false; MSGS = []; DATA = null; PIN = HOV = NEAR = null; renderChat(); renderPanel(); $("#status").textContent = ""; };
+$("#bnew").onclick = () => { if (MODE === "saved") return; SAVED = false; MSGS = []; DATA = null; PIN = PINT = HOV = NEAR = null; renderChat(); renderPanel(); $("#status").textContent = ""; };
 $("#bset").onclick = () => $("#settings").classList.toggle("open");
 $("#tpl").onchange = renderChat; $("#tint").onchange = renderChat;
 $("#win").onchange = reread; $("#lens").onchange = reread;
@@ -391,17 +407,23 @@ function renderBrain(sel) {
   const box = $("#bm"); if (!box) return;
   const ms = shown().filter(m => (m.cells || m.grid || []).length);
   if (!ms.length) { box.innerHTML = `<div class="empty">no meters on</div>`; return; }
-  const layers = [...new Set([...CFG.grid_layers, ...ms.flatMap(m => m.cells || m.grid || [])])].sort((a, b) => a - b);
-  const colLab = L => L === 63 ? "out" : L;
-  let h = `<table><tr><td class="lab">shallow → deep</td>${layers.map(L => `<th>${colLab(L)}</th>`).join("")}</tr>`;
+  const layers = CFG.grid_layers.slice().sort((a, b) => a - b);
+  const zAt = (m, L) => {
+    const g = DATA && sel && DATA.meters[m.name] && DATA.meters[m.name].grid ? DATA.meters[m.name].grid[L] : null;
+    return g ? (sel.tok !== undefined ? g[sel.tok] : avg(g, sel.idx)) : null;
+  };
+  let h = `<table><tr><td class="lab">shallow → deep</td>${layers.map(L => `<th>${L}</th>`).join("")}</tr>`;
   for (const m of ms) {
-    const cells = m.cells || m.grid;
-    const own = cells.reduce((b, L) => Math.abs(L - m.layer) < Math.abs(b - m.layer) ? L : b, cells[0]);
     h += `<tr><td class="lab" title="${esc(m.label)}">${esc(m.label)}</td>`;
+    if (m.kind === "neuron") {   // one neuron at one layer: one wide cell
+      const z = zAt(m, m.layer);
+      h += `<td colspan="${layers.length}" class="wide" style="background:${cellcol(z)}" title="${esc(m.label)} L${m.layer}${z !== null ? ": " + z.toFixed(1) : ""}">one neuron, layer ${m.layer}</td></tr>`;
+      continue;
+    }
+    const cells = m.cells || m.grid;
+    const own = m.kind === "logits" ? null : cells.reduce((b, L) => Math.abs(L - m.layer) < Math.abs(b - m.layer) ? L : b, cells[0]);
     for (const L of layers) {
-      const g = DATA && sel && DATA.meters[m.name] && DATA.meters[m.name].grid ? DATA.meters[m.name].grid[L] : null;
-      const z = g ? (sel.tok !== undefined ? g[sel.tok] : avg(g, sel.idx)) : null;
-      const has = cells.includes(L);
+      const z = zAt(m, L), has = cells.includes(L);
       h += `<td class="${has && L === own ? "own" : ""}" style="background:${has ? cellcol(z) : "transparent"}" title="${esc(m.label)} L${L}${z !== null && z !== undefined ? ": " + z.toFixed(1) : ""}"></td>`;
     }
     h += "</tr>";
@@ -414,7 +436,8 @@ function renderReadings() {
   if (!CFG) return;
   const sel = selection();
   const head = $("#tokhead");
-  document.querySelectorAll("#chat .turn.near").forEach(x => x.classList.remove("near"));
+  document.querySelectorAll("#chat .turn.near, #chat .turn.pinned").forEach(x => x.classList.remove("near", "pinned"));
+  if (PINT !== null) { const pe = document.querySelector(`#chat .turn[data-turn="${PINT}"]`); if (pe) pe.classList.add("pinned"); }
   if (!sel) {
     head.innerHTML = `<span class="empty">${DATA ? "hover over a word" : "chat to see readings; hover over any word"}</span>`;
   } else if (sel.tok !== undefined) {
@@ -424,8 +447,8 @@ function renderReadings() {
   } else {
     const T = TURNS[sel.turn];
     const el = document.querySelector(`#chat .turn[data-turn="${sel.turn}"]`);
-    if (el) el.classList.add("near");
-    head.innerHTML = `<span class="t">${T.role === "user" ? "your" : "model"} turn ${T.n} (average)</span><span class="r">${T.idx.length} tokens · hover a word for one token</span><div class="nx">&nbsp;</div>`;
+    if (el && !sel.pinned) el.classList.add("near");
+    head.innerHTML = `<span class="t">${T.role === "user" ? "your" : "model"} turn ${T.n} (average${sel.pinned ? ", pinned" : ""})</span><span class="r">${T.idx.length} tokens · ${sel.pinned ? "click it again or press Esc to unpin" : "click to pin · hover a word for one token"}</span><div class="nx">&nbsp;</div>`;
   }
   const tokIdx = sel ? (sel.tok !== undefined ? (TURNS[DATA.tokens[sel.tok].turn] || {idx: []}).idx : sel.idx) : [];
   document.querySelectorAll(".m").forEach(el => {
