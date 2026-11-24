@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Personality Test</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fff; color: #1a1a1a; line-height: 1.5;
+}
+#app { max-width: 640px; margin: 0 auto; padding: 48px 16px 80px; }
+h1 { font-size: 28px; font-weight: 600; text-align: center; }
+.center { text-align: center; }
+button {
+  font: inherit; font-size: 16px; padding: 10px 28px; border-radius: 6px;
+  border: 1px solid #1a1a1a; background: #1a1a1a; color: #fff; cursor: pointer;
+}
+button:disabled { opacity: .3; cursor: default; }
+#start-screen { padding-top: 18vh; }
+#start-screen button { margin-top: 28px; }
+
+.item { padding: 22px 0; border-bottom: 1px solid #eee; }
+.item:last-of-type { border-bottom: none; }
+.q { font-size: 17px; margin-bottom: 14px; }
+.scale { display: flex; justify-content: space-between; max-width: 360px; margin: 0 auto; }
+.opt { display: flex; flex-direction: column; align-items: center; width: 64px; }
+.dot {
+  width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--c);
+  background: #fff; cursor: pointer; padding: 0;
+}
+.dot.on { background: var(--c); }
+.lab { font-size: 13px; color: #555; margin-top: 6px; height: 18px; }
+.nav { text-align: center; margin-top: 28px; }
+
+.yn { display: flex; gap: 12px; justify-content: center; }
+.yn button { background: #fff; color: #1a1a1a; min-width: 90px; }
+.yn button.on { background: #1a1a1a; color: #fff; }
+.result { font-size: 18px; margin-top: 20px; }
+.big { font-size: 40px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, get, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { firebaseConfig } from "../nertz/firebase-config.js";
+
+// ---- Items (5 per page) ----
+const ITEMS = [
+  "People feel especially comfortable sharing things with me because I’m unlikely to judge them.",
+  "I often wind up prioritizing other people’s feelings over my own.",
+  "I only fully let loose around people who know me well.",
+  "I often notice social dynamics playing out that other people aren’t aware of.",
+  "Although my life is generally predictable, I also like it to have some degree of unpredictability.",
+  "Although my life is generally unpredictable, I also like it to have some degree of predictability.",
+  "Recently I’ve been meaning to get around to some less essential tasks or projects.",
+  "I care more than people realize about how others perceive me.",
+  "I don’t like to beat around the bush; I prefer to tell it like it is.",
+  "I tend to really like or really dislike people, with little in-between.",
+  "Once I let someone into my inner circle, I’ll passionately stick up for them.",
+  "I might come across as chill, but I’m deeply passionate about the things that matter to me.",
+  "I find it easier to have conversations with people I already know.",
+  "I believe that no matter how much you love someone, it’s still important to maintain a sense of individuality.",
+  "Despite what people around me might think, I’m actually an extrovert in some situations and an introvert in others.",
+  "A part of me sometimes wonders whether I’m faking my competence/values, including to myself.",
+  "I enjoy having deep conversations.",
+  "I enjoy getting lost in thought.",
+  "I get very upset about how certain people are systematically ignored by those in positions of authority.",
+  "I sometimes replay conversations afterward in my head and think about what I could have said differently.",
+  "I hold myself to a higher standard than I hold other people to.",
+  "I think things through myself instead of just following public opinion.",
+  "I feel like I have a lot of potential.",
+  "People tend to appreciate my sense of humor more once they know me better.",
+  "I think some rules are pointless and ought to be broken.",
+];
+const PER_PAGE = 5;
+const COLORS = ["#c62828", "#ef9a9a", "#9e9e9e", "#a5d6a7", "#2e7d32"];
+
+let db = null;
+try { db = getDatabase(initializeApp(firebaseConfig, "upt")); } catch (e) { console.error(e); }
+
+const app = document.getElementById("app");
+const answers = new Array(ITEMS.length).fill(null);
+const CHECKS = ["Was this your first time taking this test?", "Did you answer honestly?"];
+const checks = [null, null];
+const nPages = Math.ceil(ITEMS.length / PER_PAGE);
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function startScreen() {
+  app.innerHTML = `<div id="start-screen" class="center">
+    <h1>Universal Personality Test</h1>
+    <button id="go">Start</button></div>`;
+  document.getElementById("go").onclick = () => page(0);
+}
+
+function page(p) {
+  const idx = [...Array(ITEMS.length).keys()].slice(p * PER_PAGE, (p + 1) * PER_PAGE);
+  app.innerHTML = idx.map(i => `
+    <div class="item">
+      <div class="q">${esc(ITEMS[i])}</div>
+      <div class="scale">
+        ${COLORS.map((c, k) => `
+          <div class="opt">
+            <button class="dot" style="--c:${c}" data-i="${i}" data-v="${k + 1}" aria-label="${k + 1} of 5"></button>
+            <div class="lab">${k === 0 ? "Disagree" : k === 4 ? "Agree" : ""}</div>
+          </div>`).join("")}
+      </div>
+    </div>`).join("") +
+    `<div class="nav"><button id="next" disabled>Next</button></div>`;
+  window.scrollTo(0, 0);
+
+  const next = document.getElementById("next");
+  const check = () => { next.disabled = idx.some(i => answers[i] === null); };
+  app.querySelectorAll(".dot").forEach(d => d.onclick = () => {
+    const i = +d.dataset.i;
+    answers[i] = +d.dataset.v;
+    app.querySelectorAll(`.dot[data-i="${i}"]`).forEach(x => x.classList.toggle("on", x === d));
+    check();
+  });
+  next.onclick = () => (p === nPages - 1 ? checkPage() : page(p + 1));
+}
+
+function checkPage() {
+  app.innerHTML = CHECKS.map((q, i) => `
+    <div class="item">
+      <div class="q">${esc(q)}</div>
+      <div class="yn">
+        <button data-i="${i}" data-v="yes">Yes</button>
+        <button data-i="${i}" data-v="no">No</button>
+      </div>
+    </div>`).join("") +
+    `<div class="nav"><button id="next" disabled>Finish</button></div>`;
+  window.scrollTo(0, 0);
+  const next = document.getElementById("next");
+  app.querySelectorAll(".yn button").forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    checks[i] = b.dataset.v === "yes";
+    app.querySelectorAll(`.yn button[data-i="${i}"]`).forEach(x => x.classList.toggle("on", x === b));
+    next.disabled = checks.includes(null);
+  });
+  next.onclick = finish;
+}
+
+async function finish() {
+  const mine = answers.reduce((a, b) => a + b, 0) / answers.length;
+  app.innerHTML = `<div class="center" style="padding-top:12vh">
+    <div class="result">Your average score</div>
+    <div class="big">${mine.toFixed(2)} / 5</div>
+    <div class="result" style="margin-top:32px">Average of everyone so far</div>
+    <div class="big" id="everyone">…</div></div>`;
+  const out = document.getElementById("everyone");
+  try {
+    const counted = checks[0] && checks[1];
+    push(ref(db, "upt_responses"), {
+      answers, avg: mine, firstTime: checks[0], honest: checks[1], counted, t: Date.now()
+    }).catch(console.error);
+    let s;
+    if (counted) {
+      const res = await runTransaction(ref(db, "upt_stats"), s => {
+        s = s || { n: 0, sum: 0 };
+        return { n: s.n + 1, sum: s.sum + mine };
+      });
+      s = res.snapshot.val();
+    } else {
+      s = (await get(ref(db, "upt_stats"))).val();
+    }
+    if (!s || !s.n) { out.textContent = "—"; return; }
+    out.textContent = `${(s.sum / s.n).toFixed(2)} / 5`;
+  } catch (e) {
+    console.error(e);
+    out.textContent = "unavailable";
+  }
+}
+
+startScreen();
+</script>
+</body>
+</html>
